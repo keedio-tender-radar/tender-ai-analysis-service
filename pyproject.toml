@@ -1,0 +1,22 @@
+[project]
+name = "tender-ai-analysis-service"
+version = "0.1.0"
+description = "Análisis IA + scoring Go/No-Go de Keedio Tender Radar"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.6",
+  "pydantic-settings>=2.5",
+  "httpx>=0.27",
+  "tender-contracts",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
