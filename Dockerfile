@@ -4,12 +4,13 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app/src:/app/vendor
 
+# tender-contracts vendorizado en ./vendor (repo privado). Generar antes del deploy:
+#   bash scripts/vendor-contracts.sh
 COPY pyproject.toml .
 RUN pip install --no-cache-dir \
-      "pydantic>=2.6" "pydantic-settings>=2.5" "httpx>=0.27" \
-      "tender-contracts @ git+https://github.com/keedio-tender-radar/tender-shared-contracts.git"
+      "pydantic>=2.6" "pydantic-settings>=2.5" "httpx>=0.27"
 
 COPY . .
 

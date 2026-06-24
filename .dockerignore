@@ -4,11 +4,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
-*.egg-info/
+.git/
 .env
 *.env
 !.env.example
-.DS_Store
-.idea/
-.vscode/
-vendor/
+tests/
+*.md
+# vendor/ NO se excluye (tender_contracts vendorizado para el build).
