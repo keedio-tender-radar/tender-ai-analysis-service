@@ -10,9 +10,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 #   bash scripts/vendor-contracts.sh
 COPY pyproject.toml .
 RUN pip install --no-cache-dir \
-      "pydantic>=2.6" "pydantic-settings>=2.5" "httpx>=0.27"
+      "pydantic>=2.6" "pydantic-settings>=2.5" "httpx>=0.27" \
+      "fastapi>=0.115" "uvicorn[standard]>=0.32"
 
 COPY . .
 
-# Job de análisis (one-shot). En infra se programa por cron/scheduler.
-CMD ["python", "-m", "tender_ai_analysis.main"]
+EXPOSE 8000
+
+# Servicio HTTP con POST /run (lo dispara el scheduler). El job one-shot sigue disponible
+# vía `python -m tender_ai_analysis.main`.
+CMD ["uvicorn", "tender_ai_analysis.web:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "src"]

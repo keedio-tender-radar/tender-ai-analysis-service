@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     api_url: str = "http://localhost:8000"
     score_model_version: str = "1.0.0"
 
+    # Token opcional para proteger POST /run (el scheduler envía X-Run-Token).
+    run_token: str = ""
+
     # LLM (OpenRouter). Sin key → análisis rule-based.
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
