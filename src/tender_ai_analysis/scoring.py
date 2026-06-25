@@ -24,8 +24,11 @@ class ScoreResult:
     factors: list[ScoreFactor] = field(default_factory=list)
 
 
-def _text(tender: dict) -> str:
-    return f"{tender.get('title', '')} {tender.get('summary', '')}".lower()
+def _text(tender: dict, document_text: str | None = None) -> str:
+    base = f"{tender.get('title', '')} {tender.get('summary', '')}"
+    if document_text:
+        base = f"{base} {document_text}"
+    return base.lower()
 
 
 def _cpv_matches(cpvs: list[str], prefixes: list[str]) -> bool:
@@ -45,9 +48,14 @@ def _days_to_deadline(tender: dict) -> int | None:
     return (dt - datetime.now(UTC)).days
 
 
-def _technical_fit(tender: dict, profile: KeedioProfile, factors: list[ScoreFactor]) -> int:
+def _technical_fit(
+    tender: dict,
+    profile: KeedioProfile,
+    factors: list[ScoreFactor],
+    document_text: str | None = None,
+) -> int:
     cpvs = tender.get("cpv") or []
-    text = _text(tender)
+    text = _text(tender, document_text)
     score = 0
     if _cpv_matches(cpvs, profile.cpv_preferred):
         score += 18
@@ -106,14 +114,19 @@ def _deadline_score(days: int | None, p: KeedioProfile, factors: list[ScoreFacto
     return 7
 
 
-def score(tender: dict, analysis: AnalysisResult, profile: KeedioProfile) -> ScoreResult:
+def score(
+    tender: dict,
+    analysis: AnalysisResult,
+    profile: KeedioProfile,
+    document_text: str | None = None,
+) -> ScoreResult:
     factors: list[ScoreFactor] = []
     hints = analysis.hints
     cpvs = tender.get("cpv") or []
     days = _days_to_deadline(tender)
 
     excluded = _cpv_matches(cpvs, profile.cpv_excluded)
-    technical = 0 if excluded else _technical_fit(tender, profile, factors)
+    technical = 0 if excluded else _technical_fit(tender, profile, factors, document_text)
     tech_solv, econ_solv = _solvency_scores(hints)
     contractual = {"high": 2, "medium": 3, "low": 5}.get((hints.contractual_risk or "").lower(), 4)
 

@@ -54,3 +54,13 @@ def test_no_signals_low_score(profile):
     t = tender(title="Servicio genérico", summary="", cpv=[], budget_amount=None)
     r = score(t, _analysis(), profile)
     assert r.breakdown.technical_fit == 0
+
+
+def test_document_text_boosts_technical_fit(profile):
+    # Sin documento: título neutro, sin keywords → technical_fit bajo.
+    t = {"title": "Servicio", "summary": "", "cpv": [], "budget_amount": 200000}
+    base = score(t, _analysis(), profile)
+    # Con documento lleno de keywords de encaje → technical_fit sube.
+    doc = "plataforma de datos, integración de api, machine learning, cloud y devops"
+    boosted = score(t, _analysis(), profile, document_text=doc)
+    assert boosted.breakdown.technical_fit > base.breakdown.technical_fit

@@ -43,8 +43,12 @@ def _fallback(tender: dict) -> AnalysisResult:
     return AnalysisResult(summary=summary, generated_by="rule-based")
 
 
-def analyze(tender: dict, client_factory=None) -> AnalysisResult:
-    """Devuelve el análisis del anuncio; LLM si está disponible, si no rule-based."""
+def analyze(tender: dict, document_text: str | None = None, client_factory=None) -> AnalysisResult:
+    """Devuelve el análisis del anuncio; LLM si está disponible, si no rule-based.
+
+    Si se aporta `document_text` (texto del pliego), se incluye un extracto en el prompt para un
+    análisis más fundado.
+    """
     from tender_ai_analysis.config import settings
 
     if not settings.openrouter_api_key and client_factory is None:
@@ -56,6 +60,8 @@ def analyze(tender: dict, client_factory=None) -> AnalysisResult:
         f"CPV: {', '.join(tender.get('cpv', []) or [])}\n"
         f"Presupuesto: {tender.get('budget_amount')}\n"
     )
+    if document_text:
+        user += f"\nExtracto del pliego:\n{document_text[:6000]}\n"
     data = llm.call_json(_SYSTEM, user, client_factory=client_factory)
     if data is None:
         return _fallback(tender)
