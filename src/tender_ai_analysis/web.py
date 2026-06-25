@@ -64,3 +64,22 @@ def run_analysis() -> dict:
         "go": result.go,
         "errors": result.errors,
     }
+
+
+@app.post("/run-ingestion", dependencies=[Depends(_auth)])
+def run_ingestion_job() -> dict:
+    """Job de ingesta (fusionado en este servicio para ahorrar un slot de compute)."""
+    from tender_ingestion.jobs.daily_ingestion_job import run_ingestion
+    from tender_ingestion.main import build_filter_config, build_sources
+    from tender_ingestion.publishers.api_client import ApiClient as IngestApiClient
+
+    api = IngestApiClient(settings.api_url)
+    result = run_ingestion(build_sources(), api, build_filter_config())
+    return {
+        "fetched": result.fetched,
+        "relevant": result.relevant,
+        "published": result.published,
+        "duplicates": result.duplicates,
+        "filtered_out": result.filtered_out,
+        "errors": result.errors,
+    }
