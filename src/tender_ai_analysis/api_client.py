@@ -23,13 +23,14 @@ class ApiClient:
             resp.raise_for_status()
             return resp.json()
 
-    def put_score(self, tender_id: str, result: ScoreResult) -> dict:
+    def put_score(self, tender_id: str, result: ScoreResult, summary: str | None = None) -> dict:
         payload = {
             "total": result.total,
             "breakdown": result.breakdown.model_dump(),
             "recommendation": result.recommendation.value,
             "hard_rules": result.hard_rules,
             "factors": [f.model_dump() for f in result.factors],
+            "summary": summary,
             "model_version": settings.score_model_version,
         }
         with self._client() as client:

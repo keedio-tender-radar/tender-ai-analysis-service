@@ -10,7 +10,7 @@ class FakeApi:
     def list_pending(self, **kwargs):
         return self._pending
 
-    def put_score(self, tender_id, result):
+    def put_score(self, tender_id, result, summary=None):
         self.scored.append((tender_id, result))
         return {"id": "score-" + tender_id}
 
@@ -26,7 +26,7 @@ def test_job_scores_pending(profile):
 
 def test_job_isolates_errors(profile):
     class BadApi(FakeApi):
-        def put_score(self, tender_id, result):
+        def put_score(self, tender_id, result, summary=None):
             if tender_id == "boom":
                 raise RuntimeError("api down")
             return super().put_score(tender_id, result)

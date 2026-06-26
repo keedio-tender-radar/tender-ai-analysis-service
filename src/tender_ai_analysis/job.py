@@ -26,7 +26,7 @@ def run(api_client, profile: KeedioProfile, *, client_factory=None) -> AnalysisJ
         try:
             analysis = analysis_mod.analyze(tender, client_factory=client_factory)
             score_result = score(tender, analysis, profile)
-            api_client.put_score(tender["id"], score_result)
+            api_client.put_score(tender["id"], score_result, summary=analysis.summary)
             result.scored += 1
             if score_result.recommendation.value == "go":
                 result.go += 1
