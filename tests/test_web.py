@@ -8,6 +8,7 @@ client = TestClient(app)
 
 def test_analyze_endpoint(monkeypatch):
     monkeypatch.setattr(settings, "openrouter_api_key", "")  # rule-based determinista
+    monkeypatch.setattr(settings, "api_url", "")  # sin fetch de perfil remoto en tests
     tender = {"title": "Plataforma de datos", "cpv": ["72300000"], "budget_amount": 620000}
     resp = client.post("/analyze", json={"tender": tender})
     assert resp.status_code == 200
@@ -19,6 +20,7 @@ def test_analyze_endpoint(monkeypatch):
 
 def test_analyze_with_document_raises_score(monkeypatch):
     monkeypatch.setattr(settings, "openrouter_api_key", "")
+    monkeypatch.setattr(settings, "api_url", "")
     tender = {"title": "Servicio", "cpv": [], "budget_amount": 200000}
     plain = client.post("/analyze", json={"tender": tender}).json()
     withdoc = client.post(

@@ -34,11 +34,15 @@ def build_sources() -> list[Source]:
 
 
 def build_filter_config() -> FilterConfig:
+    """Filtros Keedio: el perfil editable de tender-api tiene prioridad; env de respaldo."""
+    from tender_ingestion.profile_client import fetch_profile
+
+    remote = fetch_profile()
     return FilterConfig(
-        cpv_preferred=settings.cpv_preferred_list,
-        cpv_excluded=settings.cpv_excluded_list,
-        keywords_positive=settings.keywords_positive_list,
-        keywords_negative=settings.keywords_negative_list,
+        cpv_preferred=remote.get("cpv_preferred") or settings.cpv_preferred_list,
+        cpv_excluded=remote.get("cpv_excluded") or settings.cpv_excluded_list,
+        keywords_positive=remote.get("keywords_positive") or settings.keywords_positive_list,
+        keywords_negative=remote.get("keywords_negative") or settings.keywords_negative_list,
     )
 
 

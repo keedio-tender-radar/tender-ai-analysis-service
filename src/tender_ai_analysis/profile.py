@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tender_ai_analysis.config import settings
+from tender_ai_analysis.profile_client import fetch_profile
 
 
 @dataclass
@@ -21,11 +22,13 @@ class KeedioProfile:
 
 
 def from_settings() -> KeedioProfile:
+    """Perfil para el scoring: el perfil editable de tender-api tiene prioridad; env de respaldo."""
+    remote = fetch_profile()
     return KeedioProfile(
-        cpv_preferred=settings.cpv_preferred_list,
-        cpv_excluded=settings.cpv_excluded_list,
-        keywords_positive=settings.keywords_positive_list,
-        keywords_negative=settings.keywords_negative_list,
+        cpv_preferred=remote.get("cpv_preferred") or settings.cpv_preferred_list,
+        cpv_excluded=remote.get("cpv_excluded") or settings.cpv_excluded_list,
+        keywords_positive=remote.get("keywords_positive") or settings.keywords_positive_list,
+        keywords_negative=remote.get("keywords_negative") or settings.keywords_negative_list,
         budget_min=settings.budget_min,
         budget_target_low=settings.budget_target_low,
         budget_target_high=settings.budget_target_high,
