@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from tender_ai_analysis import analysis as analysis_mod
+from tender_ai_analysis import drafts as drafts_mod
 from tender_ai_analysis.api_client import ApiClient
 from tender_ai_analysis.config import settings
 from tender_ai_analysis.job import run
@@ -22,6 +23,12 @@ app = FastAPI(title=settings.app_name, version=settings.version)
 class AnalyzeRequest(BaseModel):
     tender: dict = Field(default_factory=dict)
     document_text: str | None = None
+
+
+class DraftsRequest(BaseModel):
+    tender: dict = Field(default_factory=dict)
+    document_text: str | None = None
+    score: dict | None = None
 
 
 def _auth(x_run_token: str | None = Header(default=None)) -> None:
@@ -53,6 +60,13 @@ def analyze_one(payload: AnalyzeRequest) -> dict:
         },
         "used_document": bool(payload.document_text),
     }
+
+
+@app.post("/generate-drafts", dependencies=[Depends(_auth)])
+def generate_drafts(payload: DraftsRequest) -> dict:
+    """Genera borradores de oferta (Go/No-Go, checklist, resumen, memoria, matriz)."""
+    drafts = drafts_mod.generate_drafts(payload.tender, payload.document_text, payload.score)
+    return {"drafts": drafts}
 
 
 @app.post("/run", dependencies=[Depends(_auth)])
