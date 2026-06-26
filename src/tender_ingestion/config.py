@@ -53,6 +53,9 @@ class Settings(BaseSettings):
         "obra civil,construcción,limpieza,vigilancia,catering,jardinería,mobiliario,transporte"
     )
 
+    # Portales extra configurables (autonómicos/sectoriales). Lista JSON; vacío = ninguno.
+    extra_portal_feeds_json: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property

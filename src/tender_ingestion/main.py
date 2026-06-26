@@ -10,6 +10,7 @@ import logging
 
 from tender_ingestion.config import settings
 from tender_ingestion.connectors.placsp_connector import PlacspConnector
+from tender_ingestion.connectors.portal_registry import extra_portal_sources
 from tender_ingestion.connectors.ted_connector import TedConnector
 from tender_ingestion.jobs.daily_ingestion_job import (
     FilterConfig,
@@ -24,10 +25,12 @@ logger = logging.getLogger("tender_ingestion")
 
 
 def build_sources() -> list[Source]:
-    return [
+    sources = [
         Source(PlacspConnector(settings.placsp_feed_url), placsp_normalizer.normalize),
         Source(TedConnector(settings.ted_api_url), ted_normalizer.normalize),
     ]
+    sources.extend(extra_portal_sources(settings.extra_portal_feeds_json))
+    return sources
 
 
 def build_filter_config() -> FilterConfig:
