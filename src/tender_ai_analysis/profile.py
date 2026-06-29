@@ -19,6 +19,8 @@ class KeedioProfile:
     budget_target_high: float = 800000.0
     deadline_min_days: int = 7
     deadline_comfortable_days: int = 21
+    go_threshold: int = 80
+    revisar_threshold: int = 40
 
 
 def from_settings() -> KeedioProfile:
@@ -34,4 +36,6 @@ def from_settings() -> KeedioProfile:
         budget_target_high=settings.budget_target_high,
         deadline_min_days=settings.deadline_min_days,
         deadline_comfortable_days=settings.deadline_comfortable_days,
+        go_threshold=int(remote.get("go_threshold") or 80),
+        revisar_threshold=int(remote.get("revisar_threshold") or 40),
     )

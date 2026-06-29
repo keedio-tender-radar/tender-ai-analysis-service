@@ -151,7 +151,7 @@ def score(
             ScoreFactor(kind=FactorKind.NEGATIVE, message="CPV en la lista de excluidos.")
         )
     else:
-        recommendation = _band(total)
+        recommendation = _band(total, profile)
         if hints.partner_needed:
             recommendation = Recommendation.PARTNER
             hard_rules.append("partner_needed")
@@ -169,9 +169,11 @@ def score(
     )
 
 
-def _band(total: int) -> Recommendation:
-    if total >= 80:
+def _band(total: int, profile: KeedioProfile | None = None) -> Recommendation:
+    go = getattr(profile, "go_threshold", 80) if profile else 80
+    revisar = getattr(profile, "revisar_threshold", 40) if profile else 40
+    if total >= go:
         return Recommendation.GO
-    if total >= 40:
+    if total >= revisar:
         return Recommendation.REVISAR
     return Recommendation.NO_GO

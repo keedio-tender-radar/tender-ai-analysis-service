@@ -36,9 +36,35 @@ def _auth(x_run_token: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="Token de ejecución inválido o ausente.")
 
 
+def _report_run(job: str, status: str, detail: str | None = None, count: int | None = None) -> None:
+    """Reporta el resultado del job a tender-api (/api/runs) para observabilidad. Best-effort."""
+    if not settings.api_url:
+        return
+    try:
+        import httpx
+
+        headers = {"X-Run-Token": settings.run_token} if settings.run_token else {}
+        httpx.post(
+            f"{settings.api_url.rstrip('/')}/api/runs",
+            json={"job": job, "status": status, "detail": detail, "count": count},
+            headers=headers,
+            timeout=10,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": settings.app_name, "version": settings.version}
+    from tender_ai_analysis.llm import _models
+
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "version": settings.version,
+        "llm_enabled": bool(settings.openrouter_api_key),
+        "llm_models": _models() if settings.openrouter_api_key else [],
+    }
 
 
 @app.post("/analyze", dependencies=[Depends(_auth)])
@@ -71,7 +97,16 @@ def generate_drafts(payload: DraftsRequest) -> dict:
 
 @app.post("/run", dependencies=[Depends(_auth)])
 def run_analysis() -> dict:
-    result = run(ApiClient(), from_settings())
+    try:
+        result = run(ApiClient(), from_settings())
+    except Exception as exc:  # noqa: BLE001
+        _report_run("analisis", "error", detail=f"{type(exc).__name__}: {exc}")
+        raise
+    _report_run(
+        "analisis", "error" if result.errors else "ok",
+        detail=f"{len(result.errors)} errores" if result.errors else None,
+        count=result.scored,
+    )
     return {
         "processed": result.processed,
         "scored": result.scored,
@@ -88,7 +123,16 @@ def run_ingestion_job() -> dict:
     from tender_ingestion.publishers.api_client import ApiClient as IngestApiClient
 
     api = IngestApiClient(settings.api_url)
-    result = run_ingestion(build_sources(), api, build_filter_config())
+    try:
+        result = run_ingestion(build_sources(), api, build_filter_config())
+    except Exception as exc:  # noqa: BLE001
+        _report_run("ingesta", "error", detail=f"{type(exc).__name__}: {exc}")
+        raise
+    _report_run(
+        "ingesta", "error" if result.errors else "ok",
+        detail=f"{len(result.errors)} errores" if result.errors else None,
+        count=result.published,
+    )
     return {
         "fetched": result.fetched,
         "relevant": result.relevant,
