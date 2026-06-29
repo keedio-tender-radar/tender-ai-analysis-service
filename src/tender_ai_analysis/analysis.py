@@ -34,7 +34,10 @@ _SYSTEM = (
     "Dado el anuncio de una licitación, devuelve EXCLUSIVAMENTE un objeto JSON (sin markdown) "
     "con: summary (string), functional_requirements (array de strings), risks (array de "
     "objetos {risk, mitigation}), hints (objeto {solvency_risk: low|medium|high, partner_needed: "
-    "bool, contractual_risk: low|medium|high, incompatibility: bool}). En español."
+    "bool, contractual_risk: low|medium|high, incompatibility: bool}). En español. "
+    "El summary debe mencionar, si constan en el pliego: plazos clave, lotes y presupuesto por "
+    "lote, y criterios de solvencia exigidos. functional_requirements: requisitos reales del "
+    "pliego, no genéricos."
 )
 
 
@@ -61,7 +64,7 @@ def analyze(tender: dict, document_text: str | None = None, client_factory=None)
         f"Presupuesto: {tender.get('budget_amount')}\n"
     )
     if document_text:
-        user += f"\nExtracto del pliego:\n{document_text[:6000]}\n"
+        user += f"\nTexto del pliego:\n{document_text[:12000]}\n"
     data = llm.call_json(_SYSTEM, user, client_factory=client_factory)
     if data is None:
         return _fallback(tender)

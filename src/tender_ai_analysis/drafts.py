@@ -12,10 +12,18 @@ from tender_ai_analysis.config import settings
 
 _SYSTEM = (
     "Eres consultor de ofertas a licitaciones públicas para Keedio (datos, IA, integración, "
-    "cloud, ciberseguridad). Dado el anuncio y un extracto del pliego, redacta borradores de "
-    "oferta. Devuelve EXCLUSIVAMENTE un objeto JSON (sin markdown alrededor) con claves: "
-    "resumen_ejecutivo, memoria_tecnica, matriz_cumplimiento. Cada valor es texto en markdown, "
-    "en español, concreto y accionable. La matriz_cumplimiento es una tabla markdown."
+    "cloud, ciberseguridad). Dado el anuncio y el texto del pliego, redacta borradores de oferta. "
+    "Devuelve EXCLUSIVAMENTE un objeto JSON (sin markdown alrededor) con claves: "
+    "resumen_ejecutivo, memoria_tecnica, matriz_cumplimiento. Todo en español, concreto, basado "
+    "en el PLIEGO (no inventes). "
+    "- resumen_ejecutivo (markdown): incluye objeto del contrato, PLAZOS CLAVE (presentación y "
+    "ejecución), LOTES y presupuesto por lote si los hay, y CRITERIOS DE SOLVENCIA técnica y "
+    "económica exigidos. "
+    "- memoria_tecnica (markdown): esquema de propuesta alineado con los requisitos del pliego. "
+    "- matriz_cumplimiento: tabla markdown con columnas EXACTAMENTE "
+    "`| Requisito | Cumple | Evidencia |`, una fila por cada requisito REAL del pliego (técnicos, "
+    "de solvencia y administrativos), lo más exhaustiva posible; en 'Evidencia' indica cómo lo "
+    "cubre Keedio."
 )
 
 _LLM_DRAFTS = [
@@ -91,7 +99,7 @@ def generate_drafts(
         f"Presupuesto: {tender.get('budget_amount')}\n"
     )
     if document_text:
-        user += f"\nExtracto del pliego:\n{document_text[:6000]}\n"
+        user += f"\nTexto del pliego:\n{document_text[:14000]}\n"
 
     data = None
     if settings.openrouter_api_key or client_factory is not None:
