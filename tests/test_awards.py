@@ -14,9 +14,10 @@ def test_ted_awards_parse():
                     "notice-title": {"spa": "Adjudicación servicios de datos"},
                     "buyer-name": {"spa": ["Ayuntamiento de Bilbao"]},
                     "classification-cpv": ["72000000", "72000000"],
-                    "total-value": 100000,
+                    "estimated-value-proc": 100000,
+                    "total-value": 82000,
                     "result-value-notice": 82000,
-                    "organisation-name-serv-prov": {"spa": ["Empresa Alfa SL"]},
+                    "organisation-name-tenderer": {"spa": ["Empresa Alfa SL"]},
                     "publication-date": "2026-02-10+01:00",
                     "links": {"html": {"SPA": "https://ted.europa.eu/es/notice/123456-2026/html"}},
                 }
@@ -30,7 +31,7 @@ def test_ted_awards_parse():
     assert a["source_id"] == "123456-2026"
     assert a["awarded_supplier"] == "Empresa Alfa SL"
     assert a["awarded_amount"] == 82000.0
-    assert a["budget_amount"] == 100000.0
+    assert a["budget_amount"] == 100000.0  # presupuesto base = estimated-value-proc → baja real
     assert a["buyer"] == "Ayuntamiento de Bilbao"
     assert a["award_date"] == "2026-02-10"
     assert a["cpv"] == ["72000000", "72000000"]
@@ -42,7 +43,8 @@ def test_ted_awards_parse_missing_winner_is_none():
     assert a["awarded_supplier"] is None
     # Sin result-value-notice, el importe adjudicado cae a total-value (nota de formalización).
     assert a["awarded_amount"] == 5000.0
-    assert a["budget_amount"] == 5000.0
+    # Sin estimated-value-proc no hay presupuesto base → baja no calculable (None, no 0% falso).
+    assert a["budget_amount"] is None
 
 
 class _FakeConnector(BaseConnector):

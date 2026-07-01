@@ -18,15 +18,18 @@ from .base_connector import BaseConnector
 from .ted_connector import _html_url, _ml
 
 # Campos válidos de TED v3 (verificados contra la API; pedir campos no soportados da 400 global).
-# Adjudicatario: organisation-name-serv-prov (proveedor); importe adjudicado: result-value-notice.
+# Adjudicatario: organisation-name-tenderer (empresa/s licitadora/s ganadora/s; es lista en marcos).
+# Presupuesto base: estimated-value-proc (valor estimado del procedimiento) → permite baja real.
+# Importe adjudicado: result-value-notice (fallback total-value).
 _FIELDS = [
     "publication-number",
     "notice-title",
     "buyer-name",
     "classification-cpv",
+    "estimated-value-proc",
     "total-value",
     "result-value-notice",
-    "organisation-name-serv-prov",
+    "organisation-name-tenderer",
     "publication-date",
     "links",
 ]
@@ -86,9 +89,11 @@ class TedAwardsConnector(BaseConnector):
         results: list[dict] = []
         for n in notices:
             pub = str(n.get("publication-number") or "")
-            supplier = _supplier(n.get("organisation-name-serv-prov"))
+            supplier = _supplier(n.get("organisation-name-tenderer"))
             awarded = _num(n.get("result-value-notice")) or _num(n.get("total-value"))
-            budget = _num(n.get("total-value"))
+            # Presupuesto base para la baja: valor estimado del procedimiento. Si no consta, None
+            # (baja no calculable) en vez de total-value, que == adjudicado y daría baja falsa 0%.
+            budget = _num(n.get("estimated-value-proc"))
             results.append(
                 {
                     "source": "ted",
