@@ -10,26 +10,40 @@ from __future__ import annotations
 from tender_ai_analysis import llm
 from tender_ai_analysis.config import settings
 
-_SYSTEM = (
+# Un documento por llamada de TEXTO (no JSON): pedir 3 markdown en un solo JSON hacía que
+# `json.loads` fallara con saltos de línea/tablas → se caía a plantilla genérica (memoria "no según
+# el pliego"). Con call_text cada documento es independiente y anclado al pliego.
+_DRAFT_SYSTEM = (
     "Eres consultor de ofertas a licitaciones públicas para Keedio (datos, IA, integración, "
-    "cloud, ciberseguridad). Dado el anuncio y el texto del pliego, redacta borradores de oferta. "
-    "Devuelve EXCLUSIVAMENTE un objeto JSON (sin markdown alrededor) con claves: "
-    "resumen_ejecutivo, memoria_tecnica, matriz_cumplimiento. Todo en español, concreto, basado "
-    "en el PLIEGO (no inventes). "
-    "- resumen_ejecutivo (markdown): incluye objeto del contrato, PLAZOS CLAVE (presentación y "
-    "ejecución), LOTES y presupuesto por lote si los hay, y CRITERIOS DE SOLVENCIA técnica y "
-    "económica exigidos. "
-    "- memoria_tecnica (markdown): esquema de propuesta alineado con los requisitos del pliego. "
-    "- matriz_cumplimiento: tabla markdown con columnas EXACTAMENTE "
-    "`| Requisito | Cumple | Evidencia |`, una fila por cada requisito REAL del pliego (técnicos, "
-    "de solvencia y administrativos), lo más exhaustiva posible; en 'Evidencia' indica cómo lo "
-    "cubre Keedio."
+    "cloud, ciberseguridad). Redacta en español, concreto y basado EXCLUSIVAMENTE en el anuncio y "
+    "el pliego proporcionados (no inventes datos que no consten). Devuelve SOLO el documento "
+    "pedido en markdown, sin texto introductorio ni explicaciones alrededor."
 )
 
 _LLM_DRAFTS = [
-    ("resumen_ejecutivo", "Resumen ejecutivo"),
-    ("memoria_tecnica", "Memoria técnica (esquema)"),
-    ("matriz_cumplimiento", "Matriz de cumplimiento"),
+    (
+        "resumen_ejecutivo",
+        "Resumen ejecutivo",
+        "Redacta el RESUMEN EJECUTIVO de la oferta (markdown). Incluye: objeto del contrato, "
+        "PLAZOS CLAVE (presentación y ejecución), LOTES y presupuesto por lote si los hay, y "
+        "CRITERIOS DE SOLVENCIA técnica y económica exigidos en el pliego.",
+    ),
+    (
+        "memoria_tecnica",
+        "Memoria técnica (esquema)",
+        "Redacta un ESQUEMA DE MEMORIA TÉCNICA (markdown) alineado con los requisitos REALES del "
+        "pliego (no genérico): objeto, metodología, arquitectura/solución propuesta, equipo, plan "
+        "de trabajo y cronograma, plan de calidad, seguridad, pruebas y transición/soporte. En "
+        "cada apartado referencia los requisitos concretos del pliego que cubre.",
+    ),
+    (
+        "matriz_cumplimiento",
+        "Matriz de cumplimiento",
+        "Genera la MATRIZ DE CUMPLIMIENTO como tabla markdown con columnas EXACTAMENTE "
+        "`| Requisito | Cumple | Evidencia |`, una fila por cada requisito REAL del pliego "
+        "(técnicos, de solvencia y administrativos), lo más exhaustiva posible; en 'Evidencia' "
+        "indica cómo lo cubre Keedio. Devuelve SOLO la tabla.",
+    ),
 ]
 
 
@@ -149,21 +163,21 @@ def generate_drafts(
          "content": _market_strategy(tender, score, market_context)},
     ]
 
-    user = (
+    context = (
         f"Título: {tender.get('title', '')}\n"
         f"Resumen: {tender.get('summary', '')}\n"
         f"CPV: {', '.join(tender.get('cpv', []) or [])}\n"
         f"Presupuesto: {tender.get('budget_amount')}\n"
     )
     if document_text:
-        user += f"\nTexto del pliego:\n{document_text[:14000]}\n"
+        context += f"\nTexto del pliego:\n{document_text[:14000]}\n"
 
-    data = None
-    if settings.openrouter_api_key or client_factory is not None:
-        data = llm.call_json(_SYSTEM, user, client_factory)
-
-    for kind, title in _LLM_DRAFTS:
-        content = (data or {}).get(kind)
-        body = str(content) if content else _template(kind, tender)
-        drafts.append({"kind": kind, "title": title, "content": body})
+    use_llm = settings.openrouter_api_key or client_factory is not None
+    for kind, title, instruction in _LLM_DRAFTS:
+        body = None
+        if use_llm:
+            res = llm.call_text(_DRAFT_SYSTEM, f"{context}\n\n{instruction}", client_factory)
+            if res:
+                body = res[0]
+        drafts.append({"kind": kind, "title": title, "content": body or _template(kind, tender)})
     return drafts

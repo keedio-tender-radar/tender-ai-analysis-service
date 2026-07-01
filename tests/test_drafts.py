@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from tender_ai_analysis import drafts
 from tender_ai_analysis.config import settings
 from tender_ai_analysis.web import app
+from tests.conftest import chat, factory_for
 
 client = TestClient(app)
 
@@ -56,6 +57,19 @@ def test_bid_strategy_uses_market_context(monkeypatch):
     assert "20.0%" in strat["content"]
     assert "80.000" in strat["content"]  # puja sugerida = 100.000 * (1 - 0.20)
     assert "Alfa" in strat["content"]
+
+
+def test_llm_drafts_grounded_in_pliego(monkeypatch):
+    # Con LLM, la memoria/resumen/matriz se redactan por documento (call_text), ancladas al pliego.
+    monkeypatch.setattr(settings, "openrouter_models", "m")
+    factory = factory_for(lambda req: chat("## Metodología\nSegún el pliego: RAG con citas."))
+    out = drafts.generate_drafts(
+        {"title": "X", "cpv": ["72300000"]}, "PLIEGO: se exige RAG con citas", None,
+        client_factory=factory,
+    )
+    memoria = next(d for d in out if d["kind"] == "memoria_tecnica")
+    assert "Según el pliego" in memoria["content"]
+    assert "(Pendiente.)" not in memoria["content"]  # no es la plantilla genérica
 
 
 def test_bid_strategy_without_market_is_graceful():
