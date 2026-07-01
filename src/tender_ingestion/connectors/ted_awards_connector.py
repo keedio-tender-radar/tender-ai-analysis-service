@@ -17,17 +17,16 @@ from tender_ingestion.config import settings
 from .base_connector import BaseConnector
 from .ted_connector import _html_url, _ml
 
-# Campos solicitados (superset best-effort: TED varía los nombres de ganador/valor por versión).
+# Campos válidos de TED v3 (verificados contra la API; pedir campos no soportados da 400 global).
+# Adjudicatario: organisation-name-serv-prov (proveedor); importe adjudicado: result-value-notice.
 _FIELDS = [
     "publication-number",
     "notice-title",
     "buyer-name",
     "classification-cpv",
     "total-value",
-    "winner-name",
+    "result-value-notice",
     "organisation-name-serv-prov",
-    "awarded-value",
-    "result-value",
     "publication-date",
     "links",
 ]
@@ -51,12 +50,13 @@ def _num(value) -> float | None:
         return None
 
 
-def _pick(notice: dict, *keys):
-    """Primer valor no vacío entre varias claves alternativas (nombres de campo varían)."""
-    for k in keys:
-        if k in notice and notice[k]:
-            return notice[k]
-    return None
+def _supplier(value) -> str | None:
+    """Nombre del adjudicatario. Puede venir como str, lista de str o mapa multilingüe."""
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if isinstance(value, str):
+        return value.strip() or None
+    return _ml(value)
 
 
 class TedAwardsConnector(BaseConnector):
@@ -86,8 +86,8 @@ class TedAwardsConnector(BaseConnector):
         results: list[dict] = []
         for n in notices:
             pub = str(n.get("publication-number") or "")
-            supplier = _ml(_pick(n, "winner-name", "organisation-name-serv-prov"))
-            awarded = _num(_pick(n, "awarded-value", "result-value"))
+            supplier = _supplier(n.get("organisation-name-serv-prov"))
+            awarded = _num(n.get("result-value-notice")) or _num(n.get("total-value"))
             budget = _num(n.get("total-value"))
             results.append(
                 {

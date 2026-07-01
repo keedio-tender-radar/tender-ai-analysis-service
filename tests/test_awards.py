@@ -15,8 +15,8 @@ def test_ted_awards_parse():
                     "buyer-name": {"spa": ["Ayuntamiento de Bilbao"]},
                     "classification-cpv": ["72000000", "72000000"],
                     "total-value": 100000,
-                    "awarded-value": 82000,
-                    "winner-name": {"spa": "Empresa Alfa SL"},
+                    "result-value-notice": 82000,
+                    "organisation-name-serv-prov": {"spa": ["Empresa Alfa SL"]},
                     "publication-date": "2026-02-10+01:00",
                     "links": {"html": {"SPA": "https://ted.europa.eu/es/notice/123456-2026/html"}},
                 }
@@ -40,7 +40,8 @@ def test_ted_awards_parse_missing_winner_is_none():
     raw = json.dumps({"notices": [{"publication-number": "999", "total-value": 5000}]})
     a = TedAwardsConnector("http://ted").parse(raw)[0]
     assert a["awarded_supplier"] is None
-    assert a["awarded_amount"] is None
+    # Sin result-value-notice, el importe adjudicado cae a total-value (nota de formalización).
+    assert a["awarded_amount"] == 5000.0
     assert a["budget_amount"] == 5000.0
 
 
