@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     ted_scope: str = "ACTIVE"
     ted_limit: int = 50
 
+    # Adjudicaciones (inteligencia de mercado, MVP-5): notas de formalización TED (can-standard).
+    # scope ALL porque las adjudicaciones no son oportunidades "activas".
+    ted_awards_query: str = (
+        "classification-cpv IN (72000000 48000000) AND place-of-performance IN (ESP) "
+        "AND notice-type IN (can-standard) AND publication-date>=today(-365) "
+        "SORT BY publication-date DESC"
+    )
+    ted_awards_scope: str = "ALL"
+    ted_awards_limit: int = 100
+
     # Filtros (CPV por prefijo). Coma-separados en env: CPV_PREFERRED="72,48".
     cpv_preferred: str = "72,48"
     cpv_excluded: str = "45,90,79710000"

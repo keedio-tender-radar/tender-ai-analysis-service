@@ -134,6 +134,35 @@ def run_analysis() -> dict:
     }
 
 
+@app.post("/run-awards", dependencies=[Depends(_auth)])
+def run_awards_job() -> dict:
+    """Ingesta de adjudicaciones (mercado): TED formalizaciones → tender-api /api/market/awards."""
+    from tender_ingestion.config import settings as ing_settings
+    from tender_ingestion.connectors.ted_awards_connector import TedAwardsConnector
+    from tender_ingestion.jobs.awards_job import run_awards
+    from tender_ingestion.publishers.awards_publisher import AwardsPublisher
+
+    connectors = [TedAwardsConnector(ing_settings.ted_api_url)]
+    publisher = AwardsPublisher(settings.api_url, run_token=settings.run_token)
+    try:
+        result = run_awards(connectors, publisher)
+    except Exception as exc:  # noqa: BLE001
+        _report_run("adjudicaciones", "error", detail=f"{type(exc).__name__}: {exc}")
+        raise
+    _report_run(
+        "adjudicaciones", "error" if result.errors else "ok",
+        detail=f"{len(result.errors)} errores" if result.errors else None,
+        count=result.published,
+    )
+    return {
+        "fetched": result.fetched,
+        "published": result.published,
+        "created": result.created,
+        "updated": result.updated,
+        "errors": result.errors,
+    }
+
+
 @app.post("/run-ingestion", dependencies=[Depends(_auth)])
 def run_ingestion_job() -> dict:
     """Job de ingesta (fusionado en este servicio para ahorrar un slot de compute)."""
