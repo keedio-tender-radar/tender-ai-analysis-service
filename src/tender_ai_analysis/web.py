@@ -30,6 +30,7 @@ class DraftsRequest(BaseModel):
     tender: dict = Field(default_factory=dict)
     document_text: str | None = None
     score: dict | None = None
+    market_context: dict | None = None  # inteligencia de mercado (MVP-5) → estrategia de puja
 
 
 class AnswerRequest(BaseModel):
@@ -99,7 +100,10 @@ def analyze_one(payload: AnalyzeRequest) -> dict:
 @app.post("/generate-drafts", dependencies=[Depends(_auth)])
 def generate_drafts(payload: DraftsRequest) -> dict:
     """Genera borradores de oferta (Go/No-Go, checklist, resumen, memoria, matriz)."""
-    drafts = drafts_mod.generate_drafts(payload.tender, payload.document_text, payload.score)
+    drafts = drafts_mod.generate_drafts(
+        payload.tender, payload.document_text, payload.score,
+        market_context=payload.market_context,
+    )
     return {"drafts": drafts}
 
 

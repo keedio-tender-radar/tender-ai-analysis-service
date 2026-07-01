@@ -56,6 +56,54 @@ def _go_no_go(tender: dict, score: dict | None) -> str:
     return "\n".join(lines)
 
 
+def _market_strategy(tender: dict, score: dict | None, market: dict | None) -> str:
+    """Estrategia de puja a partir de la inteligencia de mercado (baja esperada + competidores).
+
+    Determinista: la baja esperada y los adjudicatarios vienen del histórico de adjudicaciones
+    (MVP-5). Si no hay muestra de mercado para la categoría, lo indica y no inventa cifras.
+    """
+    lines = ["# Estrategia de puja", ""]
+    budget = tender.get("budget_amount")
+    baja = (market or {}).get("expected_baja")
+    sample = (market or {}).get("sample_size") or 0
+
+    if not market or sample == 0:
+        lines.append(
+            "Sin histórico de adjudicaciones para esta categoría CPV todavía; no hay baja de "
+            "referencia. Fija la oferta económica según margen objetivo y coste estimado."
+        )
+        return "\n".join(lines)
+
+    lines.append(f"- **Muestra de mercado:** {sample} adjudicaciones de la categoría "
+                 f"CPV {market.get('cpv_division') or 's/d'}.")
+    if baja is not None:
+        lines.append(f"- **Baja media esperada:** {baja * 100:.1f}%")
+    if budget and baja is not None:
+        suggested = round(budget * (1 - baja), 2)
+        cur = tender.get("currency", "EUR")
+        budget_txt = f"{budget:,.0f}".replace(",", ".")
+        suggested_txt = f"{suggested:,.0f}".replace(",", ".")
+        lines.append(f"- **Presupuesto base:** {budget_txt} {cur}")
+        lines.append(f"- **Puja sugerida (baja media):** ~{suggested_txt} {cur}")
+        lines.append(
+            "  > Referencia de partida: para competir por precio hay que igualar o superar la baja "
+            "media; pondera con el margen objetivo y la solvencia técnica valorada."
+        )
+    winners = (market or {}).get("likely_winners") or []
+    if winners:
+        lines.append("")
+        lines.append("## Quién suele ganar esto")
+        for w in winners[:5]:
+            b = w.get("avg_baja")
+            baja_txt = f", baja media {b * 100:.1f}%" if b is not None else ""
+            lines.append(f"- {w.get('supplier')} — {w.get('wins')} contrato(s){baja_txt}")
+    if score and score.get("recommendation"):
+        lines.append("")
+        lines.append(f"_Recomendación del radar: {score.get('recommendation', '').upper()} "
+                     f"({score.get('total', '?')}/100)._")
+    return "\n".join(lines)
+
+
 def _checklist() -> str:
     items = [
         "Declaración responsable (DEUC si aplica)",
@@ -83,13 +131,22 @@ def _template(kind: str, tender: dict) -> str:
 
 
 def generate_drafts(
-    tender: dict, document_text: str | None, score: dict | None, client_factory=None
+    tender: dict,
+    document_text: str | None,
+    score: dict | None,
+    client_factory=None,
+    market_context: dict | None = None,
 ) -> list[dict]:
-    """Devuelve [{kind, title, content}] con los borradores de oferta."""
+    """Devuelve [{kind, title, content}] con los borradores de oferta.
+
+    `market_context` (inteligencia de mercado, MVP-5) añade una estrategia de puja determinista.
+    """
     drafts = [
         {"kind": "go_no_go", "title": "Informe Go/No-Go", "content": _go_no_go(tender, score)},
         {"kind": "checklist_administrativo", "title": "Checklist administrativo",
          "content": _checklist()},
+        {"kind": "estrategia_puja", "title": "Estrategia de puja",
+         "content": _market_strategy(tender, score, market_context)},
     ]
 
     user = (

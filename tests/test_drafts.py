@@ -9,6 +9,7 @@ client = TestClient(app)
 _KINDS = {
     "go_no_go",
     "checklist_administrativo",
+    "estrategia_puja",
     "resumen_ejecutivo",
     "memoria_tecnica",
     "matriz_cumplimiento",
@@ -37,4 +38,27 @@ def test_generate_drafts_endpoint(monkeypatch):
         json={"tender": {"title": "X"}, "score": {"total": 70, "recommendation": "revisar"}},
     )
     assert resp.status_code == 200
-    assert len(resp.json()["drafts"]) == 5
+    assert len(resp.json()["drafts"]) == 6
+
+
+def test_bid_strategy_uses_market_context(monkeypatch):
+    monkeypatch.setattr(settings, "openrouter_api_key", "")
+    t = {"title": "Datos", "cpv": ["72300000"], "budget_amount": 100000, "currency": "EUR"}
+    market = {
+        "cpv_division": "72",
+        "sample_size": 4,
+        "expected_baja": 0.20,
+        "likely_winners": [{"supplier": "Alfa", "wins": 3, "avg_baja": 0.18}],
+    }
+    out = drafts.generate_drafts(t, None, {"total": 80, "recommendation": "go"},
+                                 market_context=market)
+    strat = next(d for d in out if d["kind"] == "estrategia_puja")
+    assert "20.0%" in strat["content"]
+    assert "80.000" in strat["content"]  # puja sugerida = 100.000 * (1 - 0.20)
+    assert "Alfa" in strat["content"]
+
+
+def test_bid_strategy_without_market_is_graceful():
+    out = drafts.generate_drafts({"title": "X", "budget_amount": 100000}, None, None)
+    strat = next(d for d in out if d["kind"] == "estrategia_puja")
+    assert "Sin histórico" in strat["content"]
