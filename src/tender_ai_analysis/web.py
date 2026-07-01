@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from tender_ai_analysis import analysis as analysis_mod
+from tender_ai_analysis import answer as answer_mod
 from tender_ai_analysis import drafts as drafts_mod
 from tender_ai_analysis.api_client import ApiClient
 from tender_ai_analysis.config import settings
@@ -29,6 +30,13 @@ class DraftsRequest(BaseModel):
     tender: dict = Field(default_factory=dict)
     document_text: str | None = None
     score: dict | None = None
+
+
+class AnswerRequest(BaseModel):
+    """Pregunta + fragmentos numerados del pliego de UN expediente (RAG por expediente)."""
+
+    question: str
+    chunks: list[dict] = Field(default_factory=list)  # [{n, section, content}]
 
 
 def _auth(x_run_token: str | None = Header(default=None)) -> None:
@@ -93,6 +101,17 @@ def generate_drafts(payload: DraftsRequest) -> dict:
     """Genera borradores de oferta (Go/No-Go, checklist, resumen, memoria, matriz)."""
     drafts = drafts_mod.generate_drafts(payload.tender, payload.document_text, payload.score)
     return {"drafts": drafts}
+
+
+@app.post("/answer", dependencies=[Depends(_auth)])
+def answer_question(payload: AnswerRequest) -> dict:
+    """Chat documental: redacta la respuesta anclada a los fragmentos del pliego, con citas [n]."""
+    result = answer_mod.answer(payload.question, payload.chunks)
+    return {
+        "answer": result.answer,
+        "grounded": result.grounded,
+        "generated_by": result.generated_by,
+    }
 
 
 @app.post("/run", dependencies=[Depends(_auth)])

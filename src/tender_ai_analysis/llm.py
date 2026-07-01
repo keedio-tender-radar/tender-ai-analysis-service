@@ -58,6 +58,36 @@ def call_json(system: str, user: str, client_factory=None) -> dict | None:
     return None
 
 
+def call_text(system: str, user: str, client_factory=None) -> tuple[str, str] | None:
+    """Como `call_json` pero devuelve texto libre: (respuesta, modelo) o None.
+
+    Para respuestas en prosa (chat documental) donde no queremos forzar JSON.
+    """
+    factory = client_factory or make_client
+    with factory() as client:
+        for model in _models():
+            try:
+                resp = client.post(
+                    "/chat/completions",
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                        "temperature": 0.1,
+                    },
+                )
+            except httpx.HTTPError:
+                continue
+            if resp.status_code != 200:
+                continue
+            text = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            if text and text.strip():
+                return text.strip(), model
+    return None
+
+
 def extract_json(text: str) -> dict | None:
     if not text:
         return None

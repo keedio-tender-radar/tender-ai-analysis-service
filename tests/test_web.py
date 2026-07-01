@@ -18,6 +18,16 @@ def test_analyze_endpoint(monkeypatch):
     assert body["used_document"] is False
 
 
+def test_answer_endpoint_fallback(monkeypatch):
+    monkeypatch.setattr(settings, "openrouter_api_key", "")  # sin LLM → extractivo
+    chunks = [{"n": 1, "section": "Solvencia", "content": "Se exige solvencia técnica."}]
+    resp = client.post("/answer", json={"question": "¿solvencia?", "chunks": chunks})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["grounded"] is False
+    assert "[1]" in body["answer"]
+
+
 def test_analyze_with_document_raises_score(monkeypatch):
     monkeypatch.setattr(settings, "openrouter_api_key", "")
     monkeypatch.setattr(settings, "api_url", "")
