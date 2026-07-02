@@ -27,6 +27,7 @@ _FIELDS = [
     "buyer-name",
     "classification-cpv",
     "estimated-value-proc",
+    "estimated-value-lot",
     "total-value",
     "result-value-notice",
     "organisation-name-tenderer",
@@ -51,6 +52,16 @@ def _num(value) -> float | None:
         return float(str(value).replace(",", "."))
     except (ValueError, TypeError):
         return None
+
+
+def _sum_values(value) -> float | None:
+    """Suma valores numéricos (lista de lotes → total estimado del procedimiento) o valor único."""
+    if value is None:
+        return None
+    if isinstance(value, list):
+        nums = [x for v in value if (x := _num(v)) is not None]
+        return round(sum(nums), 2) if nums else None
+    return _num(value)
 
 
 def _supplier(value) -> str | None:
@@ -91,9 +102,12 @@ class TedAwardsConnector(BaseConnector):
             pub = str(n.get("publication-number") or "")
             supplier = _supplier(n.get("organisation-name-tenderer"))
             awarded = _num(n.get("result-value-notice")) or _num(n.get("total-value"))
-            # Presupuesto base para la baja: valor estimado del procedimiento. Si no consta, None
-            # (baja no calculable) en vez de total-value, que == adjudicado y daría baja falsa 0%.
-            budget = _num(n.get("estimated-value-proc"))
+            # Presupuesto base para la baja: valor estimado del procedimiento; si no consta, la suma
+            # de los valores estimados por lote (casa con el importe total adjudicado). Sube la
+            # cobertura de baja ~33%→~48%. Si tampoco hay, None (baja no calculable, no 0% falso).
+            budget = _num(n.get("estimated-value-proc")) or _sum_values(
+                n.get("estimated-value-lot")
+            )
             results.append(
                 {
                     "source": "ted",

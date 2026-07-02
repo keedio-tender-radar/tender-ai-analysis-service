@@ -37,6 +37,18 @@ def test_ted_awards_parse():
     assert a["cpv"] == ["72000000", "72000000"]
 
 
+def test_ted_awards_budget_falls_back_to_lot_sum():
+    # Sin estimated-value-proc, el presupuesto base = suma de estimados por lote (casa con total).
+    raw = json.dumps({"notices": [{
+        "publication-number": "L-1",
+        "estimated-value-lot": [100000, 50000],
+        "result-value-notice": 90000,
+    }]})
+    a = TedAwardsConnector("http://ted").parse(raw)[0]
+    assert a["budget_amount"] == 150000.0  # 100000 + 50000
+    assert a["awarded_amount"] == 90000.0
+
+
 def test_ted_awards_parse_missing_winner_is_none():
     raw = json.dumps({"notices": [{"publication-number": "999", "total-value": 5000}]})
     a = TedAwardsConnector("http://ted").parse(raw)[0]
