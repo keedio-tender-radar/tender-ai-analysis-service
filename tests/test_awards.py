@@ -49,6 +49,24 @@ def test_ted_awards_budget_falls_back_to_lot_sum():
     assert a["awarded_amount"] == 90000.0
 
 
+def test_fetch_enriches_budget_from_cn(monkeypatch):
+    # Adjudicación sin presupuesto pero con procedure-identifier → se recupera del anuncio CN.
+    raw = json.dumps({"notices": [{
+        "publication-number": "E-1",
+        "result-value-notice": 80000,
+        "procedure-identifier": "PID-1",
+    }]})
+    c = TedAwardsConnector("http://ted")
+    monkeypatch.setattr(c, "fetch_raw", lambda: raw)
+    monkeypatch.setattr(c, "_fetch_cn_budgets", lambda ids: {"PID-1": 100000.0})
+    awards = c.fetch()
+    assert len(awards) == 1
+    a = awards[0]
+    assert a["budget_amount"] == 100000.0  # recuperado del CN por procedure-identifier
+    assert a["awarded_amount"] == 80000.0
+    assert "_procedure_id" not in a  # campo transitorio eliminado antes de publicar
+
+
 def test_ted_awards_parse_missing_winner_is_none():
     raw = json.dumps({"notices": [{"publication-number": "999", "total-value": 5000}]})
     a = TedAwardsConnector("http://ted").parse(raw)[0]

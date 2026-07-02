@@ -31,6 +31,7 @@ _FIELDS = [
     "total-value",
     "result-value-notice",
     "organisation-name-tenderer",
+    "procedure-identifier",
     "publication-date",
     "links",
 ]
@@ -62,6 +63,13 @@ def _sum_values(value) -> float | None:
         nums = [x for v in value if (x := _num(v)) is not None]
         return round(sum(nums), 2) if nums else None
     return _num(value)
+
+
+def _pid(value) -> str | None:
+    """Identificador de procedimiento (UUID) de TED; puede venir como str o lista."""
+    if isinstance(value, list):
+        value = value[0] if value else None
+    return str(value).strip() if value else None
 
 
 def _supplier(value) -> str | None:
@@ -121,6 +129,57 @@ class TedAwardsConnector(BaseConnector):
                     "num_bidders": None,
                     "award_date": (n.get("publication-date") or "")[:10] or None,
                     "url": _html_url(n.get("links"), pub),
+                    # Transitorio (no se publica): permite cruzar con el anuncio CN para la baja.
+                    "_procedure_id": _pid(n.get("procedure-identifier")),
                 }
             )
         return results
+
+    def _fetch_cn_budgets(self, proc_ids: list[str]) -> dict[str, float]:
+        """Presupuesto base de los anuncios CN por procedure-identifier (en lotes).
+
+        Recupera el valor estimado de las adjudicaciones que no lo traen, consultando su anuncio
+        de licitación (cn-standard) del mismo procedimiento. Best-effort: un lote caído se ignora.
+        """
+        out: dict[str, float] = {}
+        for i in range(0, len(proc_ids), 25):
+            ids = " ".join(proc_ids[i : i + 25])
+            body = {
+                "query": f"notice-type IN (cn-standard) AND procedure-identifier IN ({ids})",
+                "fields": ["procedure-identifier", "estimated-value-proc", "estimated-value-lot"],
+                "page": 1,
+                "limit": 100,
+                "scope": "ALL",
+            }
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    resp = client.post(self.url, json=body, headers={"Accept": "application/json"})
+                    resp.raise_for_status()
+                    notices = resp.json().get("notices") or []
+            except httpx.HTTPError:
+                continue
+            for n in notices:
+                pid = _pid(n.get("procedure-identifier"))
+                budget = _num(n.get("estimated-value-proc")) or _sum_values(
+                    n.get("estimated-value-lot")
+                )
+                if pid and budget and pid not in out:
+                    out[pid] = budget
+        return out
+
+    def fetch(self) -> list[dict]:
+        """Parsea las adjudicaciones y enriquece la baja cruzando con el CN (por procedure-id)."""
+        awards = self.parse(self.fetch_raw())
+        missing = {
+            a["_procedure_id"]
+            for a in awards
+            if a.get("budget_amount") is None and a.get("_procedure_id")
+        }
+        if missing:
+            budgets = self._fetch_cn_budgets(list(missing))
+            for a in awards:
+                if a.get("budget_amount") is None and a.get("_procedure_id") in budgets:
+                    a["budget_amount"] = budgets[a["_procedure_id"]]
+        for a in awards:
+            a.pop("_procedure_id", None)
+        return awards
