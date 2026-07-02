@@ -88,6 +88,28 @@ def call_text(system: str, user: str, client_factory=None) -> tuple[str, str] | 
     return None
 
 
+def embed(inputs: list[str], client_factory=None) -> list[list[float]] | None:
+    """Embeddings vía OpenRouter (modelo de pago). Devuelve un vector por texto, o None si falla.
+
+    Desactivado si no hay `embedding_model` configurado (el RAG cae a BM25).
+    """
+    if not settings.embedding_model or not inputs:
+        return None
+    factory = client_factory or make_client
+    with factory() as client:
+        try:
+            resp = client.post(
+                "/embeddings", json={"model": settings.embedding_model, "input": inputs}
+            )
+        except httpx.HTTPError:
+            return None
+        if resp.status_code != 200:
+            return None
+        data = resp.json().get("data") or []
+        vectors = [row.get("embedding") for row in data if row.get("embedding")]
+        return vectors if len(vectors) == len(inputs) else None
+
+
 def extract_json(text: str) -> dict | None:
     if not text:
         return None

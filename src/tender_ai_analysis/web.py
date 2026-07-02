@@ -40,6 +40,10 @@ class AnswerRequest(BaseModel):
     chunks: list[dict] = Field(default_factory=list)  # [{n, section, content}]
 
 
+class EmbedRequest(BaseModel):
+    texts: list[str] = Field(default_factory=list)
+
+
 def _auth(x_run_token: str | None = Header(default=None)) -> None:
     if settings.run_token and x_run_token != settings.run_token:
         raise HTTPException(status_code=401, detail="Token de ejecución inválido o ausente.")
@@ -105,6 +109,14 @@ def generate_drafts(payload: DraftsRequest) -> dict:
         market_context=payload.market_context,
     )
     return {"drafts": drafts}
+
+
+@app.post("/embed", dependencies=[Depends(_auth)])
+def embed_texts(payload: EmbedRequest) -> dict:
+    """Embeddings de una lista de textos (OpenRouter). embeddings=null si está desactivado/falla."""
+    from tender_ai_analysis.llm import embed
+
+    return {"embeddings": embed(payload.texts), "model": settings.embedding_model or None}
 
 
 @app.post("/answer", dependencies=[Depends(_auth)])

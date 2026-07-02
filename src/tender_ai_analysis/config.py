@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     openrouter_models: str = (
         "meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-next-80b-a3b-instruct:free"
     )
+    # Modelo de embeddings (OpenRouter, de PAGO). Vacío = RAG semántico desactivado (usa BM25).
+    embedding_model: str = ""
 
     # Perfil Keedio (scoring).
     cpv_preferred: str = "72,48"
