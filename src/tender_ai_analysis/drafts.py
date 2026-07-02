@@ -70,6 +70,15 @@ def _go_no_go(tender: dict, score: dict | None) -> str:
     return "\n".join(lines)
 
 
+def _incumbent_line(market: dict | None) -> str | None:
+    """Línea de incumbente (adjudicatario del último contrato del órgano), o None si no hay."""
+    inc = (market or {}).get("incumbent")
+    if not inc or not inc.get("supplier"):
+        return None
+    extra = f", {inc['award_date']}" if inc.get("award_date") else ""
+    return f"- **Incumbente a batir (último contrato del órgano):** {inc['supplier']}{extra}"
+
+
 def _market_strategy(tender: dict, score: dict | None, market: dict | None) -> str:
     """Estrategia de puja a partir de la inteligencia de mercado (baja esperada + competidores).
 
@@ -86,7 +95,8 @@ def _market_strategy(tender: dict, score: dict | None, market: dict | None) -> s
             "Sin histórico de adjudicaciones para esta categoría CPV todavía; no hay baja de "
             "referencia. Fija la oferta económica según margen objetivo y coste estimado."
         )
-        return "\n".join(lines)
+        lines.append(_incumbent_line(market))
+        return "\n".join(line for line in lines if line is not None)
 
     lines.append(f"- **Muestra de mercado:** {sample} adjudicaciones de la categoría "
                  f"CPV {market.get('cpv_division') or 's/d'}.")
@@ -103,6 +113,20 @@ def _market_strategy(tender: dict, score: dict | None, market: dict | None) -> s
             "  > Referencia de partida: para competir por precio hay que igualar o superar la baja "
             "media; pondera con el margen objetivo y la solvencia técnica valorada."
         )
+    conc = (market or {}).get("concentration") or {}
+    if conc.get("label"):
+        lines.append(
+            f"- **Concentración del mercado:** {conc['label']} "
+            f"({conc.get('competitors')} competidores) — "
+            + (
+                "abierto, hay hueco para entrar."
+                if conc["label"] == "fragmentado"
+                else "dominado por pocos; incumbente fuerte."
+            )
+        )
+    inc_line = _incumbent_line(market)
+    if inc_line:
+        lines.append(inc_line)
     winners = (market or {}).get("likely_winners") or []
     if winners:
         lines.append("")

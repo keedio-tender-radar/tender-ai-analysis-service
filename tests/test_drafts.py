@@ -50,6 +50,8 @@ def test_bid_strategy_uses_market_context(monkeypatch):
         "sample_size": 4,
         "expected_baja": 0.20,
         "likely_winners": [{"supplier": "Alfa", "wins": 3, "avg_baja": 0.18}],
+        "concentration": {"hhi": 0.4, "label": "concentrado", "competitors": 3},
+        "incumbent": {"supplier": "Incumbente SL", "award_date": "2026-05-01"},
     }
     out = drafts.generate_drafts(t, None, {"total": 80, "recommendation": "go"},
                                  market_context=market)
@@ -57,6 +59,8 @@ def test_bid_strategy_uses_market_context(monkeypatch):
     assert "20.0%" in strat["content"]
     assert "80.000" in strat["content"]  # puja sugerida = 100.000 * (1 - 0.20)
     assert "Alfa" in strat["content"]
+    assert "concentrado" in strat["content"]
+    assert "Incumbente SL" in strat["content"]  # incumbente a batir
 
 
 def test_llm_drafts_grounded_in_pliego(monkeypatch):
