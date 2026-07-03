@@ -92,6 +92,17 @@ _LLM_DRAFTS = [
         "(técnicos, de solvencia y administrativos), lo más exhaustiva posible; en 'Evidencia' "
         "indica cómo lo cubre Keedio. Devuelve SOLO la tabla.",
     ),
+    (
+        "documentos_requeridos",
+        "Documentos exigidos por el pliego",
+        "Extrae del pliego la LISTA de documentos que hay que APORTAR en la oferta de ESTA "
+        "licitación (sobre administrativo, técnico y económico): declaraciones responsables / "
+        "DEUC, poderes, certificados (ISO, ROLECE, AEAT, Seg. Social), acreditación de solvencia "
+        "técnica y económica CON SUS UMBRALES concretos, avales/garantías con su importe, modelos "
+        "oficiales de oferta, y cualquier anexo exigido. Devuelve SOLO una lista markdown con "
+        "viñetas; en cada una el documento y, si consta, su requisito/umbral exacto. No inventes "
+        "documentos que no consten en el pliego.",
+    ),
 ]
 
 
@@ -212,6 +223,11 @@ def _template(kind: str, tender: dict) -> str:
             "# Memoria técnica (esquema)\n\n## Objeto\n## Metodología\n## Arquitectura\n"
             "## Equipo\n## Plan de trabajo y cronograma\n## Plan de calidad\n## Plan de seguridad\n"
             "## Plan de pruebas\n## Transición y soporte"
+        )
+    if kind == "documentos_requeridos":
+        return (
+            "# Documentos exigidos por el pliego\n\n"
+            "_Pendiente de extraer del pliego (analiza el pliego para obtener la lista concreta)._"
         )
     return "# Matriz de cumplimiento\n\n| Requisito | Cumple | Evidencia |\n|---|---|---|\n"
 
