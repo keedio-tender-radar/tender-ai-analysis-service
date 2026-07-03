@@ -76,6 +76,23 @@ def test_llm_drafts_grounded_in_pliego(monkeypatch):
     assert "(Pendiente.)" not in memoria["content"]  # no es la plantilla genérica
 
 
+def test_relevant_pliego_surfaces_deep_requirements():
+    # Objeto al principio; los requisitos técnicos REALES van al final (más allá del corte antiguo).
+    head = "Objeto del contrato: servicio de plataforma de datos."
+    filler = "\n\n".join(
+        f"Apartado administrativo {i}: procedimiento y garantías." for i in range(500)
+    )
+    reqs = (
+        "Prescripciones técnicas: se exige solvencia técnica con tres proyectos similares y "
+        "criterios de adjudicación ponderados por calidad."
+    )
+    text = f"{head}\n\n{filler}\n\n{reqs}"
+    assert len(text) > 26000  # obliga a seleccionar
+    sel = drafts._relevant_pliego(text, max_chars=8000)
+    assert "Objeto del contrato" in sel  # conserva el principio (objeto)
+    assert "solvencia técnica con tres proyectos" in sel  # rescata los requisitos del final
+
+
 def test_bid_strategy_without_market_is_graceful():
     out = drafts.generate_drafts({"title": "X", "budget_amount": 100000}, None, None)
     strat = next(d for d in out if d["kind"] == "estrategia_puja")

@@ -7,8 +7,53 @@ clave o el LLM falla. La presentación final SIEMPRE requiere revisión humana.
 
 from __future__ import annotations
 
+import re
+
 from tender_ai_analysis import llm
 from tender_ai_analysis.config import settings
+
+# Palabras que delatan los requisitos REALES del pliego (suelen ir en el PPT, no al principio).
+_REQ_KEYWORDS = (
+    "solvencia", "criterio", "prescripci", "requisit", "técnic", "tecnic", "adjudicaci",
+    "puntuaci", "valoraci", "plazo", "penalizaci", "obligaci", "experiencia", "certificad",
+    "cláusula", "clausula", "mejora", "umbral", "lote", "objeto del contrato", "presupuesto",
+    "acreditar", "deberá", "debera", "exig",
+)
+
+
+def _relevant_pliego(text: str, max_chars: int = 26000) -> str:
+    """Selecciona las secciones del pliego con más carga de requisitos (no solo el principio).
+
+    Los pliegos empiezan por la parte administrativa (PCAP); los requisitos técnicos y de solvencia
+    reales suelen ir después. Truncar por el principio los deja fuera. Aquí se conserva el objeto
+    (cabecera) y se priorizan los bloques densos en requisitos de TODO el documento.
+    """
+    if len(text) <= max_chars:
+        return text
+    blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
+    if len(blocks) <= 3:
+        return text[:max_chars]
+    head, budget = [], max_chars
+    for b in blocks[:3]:  # el objeto/introducción siempre entra
+        head.append(b)
+        budget -= len(b) + 2
+    scored = []
+    for i, b in enumerate(blocks[3:], start=3):
+        low = b.lower()
+        s = sum(low.count(k) for k in _REQ_KEYWORDS)
+        if s:
+            scored.append((s, i, b))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    picked: dict[int, str] = {}
+    for _s, i, b in scored:
+        if budget - len(b) - 2 < 0:
+            continue
+        picked[i] = b
+        budget -= len(b) + 2
+        if budget < 500:
+            break
+    ordered = head + [picked[i] for i in sorted(picked)]  # reordena por posición original
+    return "\n\n".join(ordered)[:max_chars]
 
 # Un documento por llamada de TEXTO (no JSON): pedir 3 markdown en un solo JSON hacía que
 # `json.loads` fallara con saltos de línea/tablas → se caía a plantilla genérica (memoria "no según
@@ -16,8 +61,11 @@ from tender_ai_analysis.config import settings
 _DRAFT_SYSTEM = (
     "Eres consultor de ofertas a licitaciones públicas para Keedio (datos, IA, integración, "
     "cloud, ciberseguridad). Redacta en español, concreto y basado EXCLUSIVAMENTE en el anuncio y "
-    "el pliego proporcionados (no inventes datos que no consten). Devuelve SOLO el documento "
-    "pedido en markdown, sin texto introductorio ni explicaciones alrededor."
+    "el pliego proporcionados (no inventes datos que no consten). Recoge las cifras, plazos, "
+    "umbrales, criterios de adjudicación con su ponderación y requisitos de solvencia TAL COMO "
+    "aparecen en el pliego, citando el apartado o cláusula cuando sea posible. Si un dato no "
+    "consta en el texto, escribe «no especificado en el pliego» en vez de inventarlo. Devuelve "
+    "SOLO el documento pedido en markdown, sin texto introductorio ni explicaciones alrededor."
 )
 
 _LLM_DRAFTS = [
@@ -194,7 +242,8 @@ def generate_drafts(
         f"Presupuesto: {tender.get('budget_amount')}\n"
     )
     if document_text:
-        context += f"\nTexto del pliego:\n{document_text[:14000]}\n"
+        relevant = _relevant_pliego(document_text)
+        context += f"\nTexto del pliego (secciones relevantes):\n{relevant}\n"
 
     use_llm = settings.openrouter_api_key or client_factory is not None
     for kind, title, instruction in _LLM_DRAFTS:
