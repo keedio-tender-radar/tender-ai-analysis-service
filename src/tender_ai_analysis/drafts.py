@@ -82,7 +82,13 @@ _LLM_DRAFTS = [
         "Redacta un ESQUEMA DE MEMORIA TÉCNICA (markdown) alineado con los requisitos REALES del "
         "pliego (no genérico): objeto, metodología, arquitectura/solución propuesta, equipo, plan "
         "de trabajo y cronograma, plan de calidad, seguridad, pruebas y transición/soporte. En "
-        "cada apartado referencia los requisitos concretos del pliego que cubre.",
+        "cada apartado referencia los requisitos concretos del pliego que cubre. "
+        "INCLUYE DOS diagramas en bloques de código ```mermaid VÁLIDOS y anclados a la solución: "
+        "(1) en 'Arquitectura', un `flowchart LR` con los componentes y flujos de datos de la "
+        "solución propuesta para este pliego; (2) en 'Plan de trabajo', un `flowchart TD` con las "
+        "FASES del proyecto en orden. Usa identificadores simples (A, B, C…) y etiquetas entre "
+        "corchetes `[Texto]`; evita comillas, paréntesis y acentos dentro de las etiquetas para "
+        "no romper la sintaxis Mermaid.",
     ),
     (
         "matriz_cumplimiento",
