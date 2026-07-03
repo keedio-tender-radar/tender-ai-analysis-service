@@ -26,8 +26,10 @@ class Settings(BaseSettings):
     # LLM (OpenRouter). Sin key → análisis rule-based.
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Los modelos `:free` de OpenRouter se rate-limitean (429) constantemente → poco fiables para
+    # el entregable (borradores caían a plantilla). Primario de pago barato + free como respaldo.
     openrouter_models: str = (
-        "meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-next-80b-a3b-instruct:free"
+        "openai/gpt-4o-mini,meta-llama/llama-3.3-70b-instruct:free"
     )
     # Modelo de embeddings (OpenRouter, de PAGO). Vacío = RAG semántico desactivado (usa BM25).
     embedding_model: str = ""
