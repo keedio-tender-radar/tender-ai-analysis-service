@@ -95,6 +95,16 @@ def test_relevant_pliego_surfaces_deep_requirements():
     assert "solvencia técnica con tres proyectos" in sel  # rescata los requisitos del final
 
 
+def test_strip_fence_unwraps_but_preserves_mermaid():
+    # Envoltorio ```markdown … ``` → se quita.
+    assert drafts._strip_fence("```markdown\n# Carta\nHola\n```") == "# Carta\nHola"
+    # Sin envoltorio → intacto.
+    assert drafts._strip_fence("# Carta\nHola") == "# Carta\nHola"
+    # Con mermaid interno (vallas anidadas) → NO se toca.
+    memoria = "# Memoria\n\n```mermaid\nflowchart LR\nA-->B\n```\n\nFin."
+    assert drafts._strip_fence(memoria) == memoria
+
+
 def test_bid_strategy_without_market_is_graceful():
     out = drafts.generate_drafts({"title": "X", "budget_amount": 100000}, None, None)
     strat = next(d for d in out if d["kind"] == "estrategia_puja")

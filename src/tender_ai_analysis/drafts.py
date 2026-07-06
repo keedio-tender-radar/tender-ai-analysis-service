@@ -230,6 +230,20 @@ def _checklist() -> str:
     return "# Checklist administrativo\n\n" + "\n".join(f"- [ ] {i}" for i in items)
 
 
+def _strip_fence(text: str) -> str:
+    """Quita un envoltorio ```markdown … ``` que el LLM añade a veces alrededor de TODA la
+    respuesta. No toca los diagramas mermaid internos: solo actúa si el bloque envolvente no
+    contiene otras vallas ``` dentro."""
+    t = (text or "").strip()
+    if t.startswith("```") and t.endswith("```"):
+        nl = t.find("\n")
+        if nl != -1:
+            inner = t[nl + 1 : -3]
+            if "```" not in inner:  # un único bloque envolvente, sin vallas anidadas
+                return inner.strip()
+    return text
+
+
 def _template(kind: str, tender: dict) -> str:
     title = tender.get("title", "")
     if kind == "resumen_ejecutivo":
@@ -290,6 +304,6 @@ def generate_drafts(
         if use_llm:
             res = llm.call_text(_DRAFT_SYSTEM, f"{context}\n\n{instruction}", client_factory)
             if res:
-                body = res[0]
+                body = _strip_fence(res[0])
         drafts.append({"kind": kind, "title": title, "content": body or _template(kind, tender)})
     return drafts
