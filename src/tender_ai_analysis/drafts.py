@@ -109,6 +109,16 @@ _LLM_DRAFTS = [
         "viñetas; en cada una el documento y, si consta, su requisito/umbral exacto. No inventes "
         "documentos que no consten en el pliego.",
     ),
+    (
+        "carta_presentacion",
+        "Carta de presentación",
+        "Redacta una CARTA DE PRESENTACIÓN formal (markdown) dirigida al órgano de contratación "
+        "para acompañar la oferta. Incluye: encabezado con el órgano y el número de expediente, "
+        "referencia al OBJETO concreto de esta licitación, un cuerpo que presente a Keedio "
+        "(consultora de datos, IA, integración, cloud y ciberseguridad) y su idoneidad para este "
+        "contrato, el compromiso con los plazos y la calidad, y un cierre cordial con fórmula de "
+        "despedida. Tono profesional e institucional; usa los datos reales del pliego.",
+    ),
 ]
 
 
@@ -234,6 +244,13 @@ def _template(kind: str, tender: dict) -> str:
         return (
             "# Documentos exigidos por el pliego\n\n"
             "_Pendiente de extraer del pliego (analiza el pliego para obtener la lista concreta)._"
+        )
+    if kind == "carta_presentacion":
+        return (
+            "# Carta de presentación\n\n"
+            "A la atención del órgano de contratación,\n\n"
+            f"Keedio presenta su oferta para «{title}». "
+            "(Redacción pendiente: analiza el pliego para personalizarla.)"
         )
     return "# Matriz de cumplimiento\n\n| Requisito | Cumple | Evidencia |\n|---|---|---|\n"
 

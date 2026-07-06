@@ -15,6 +15,7 @@ _KINDS = {
     "memoria_tecnica",
     "matriz_cumplimiento",
     "documentos_requeridos",
+    "carta_presentacion",
 }
 
 
@@ -40,7 +41,7 @@ def test_generate_drafts_endpoint(monkeypatch):
         json={"tender": {"title": "X"}, "score": {"total": 70, "recommendation": "revisar"}},
     )
     assert resp.status_code == 200
-    assert len(resp.json()["drafts"]) == 7
+    assert len(resp.json()["drafts"]) == 8
 
 
 def test_bid_strategy_uses_market_context(monkeypatch):
