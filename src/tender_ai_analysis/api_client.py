@@ -15,7 +15,9 @@ class ApiClient:
 
     def _client(self) -> httpx.Client:
         """Crea el cliente httpx. Monkeypatcheable en tests."""
-        return httpx.Client(base_url=self.base_url, timeout=self.timeout)
+        # Si la API exige token en lecturas (READ_API_TOKEN), nos autenticamos con RUN_TOKEN.
+        headers = {"X-Run-Token": settings.run_token} if settings.run_token else {}
+        return httpx.Client(base_url=self.base_url, timeout=self.timeout, headers=headers)
 
     def list_pending(self, *, status: str = "discovered", limit: int = 50) -> list[dict]:
         with self._client() as client:
