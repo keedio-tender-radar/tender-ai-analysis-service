@@ -100,9 +100,15 @@ def test_strip_fence_unwraps_but_preserves_mermaid():
     assert drafts._strip_fence("```markdown\n# Carta\nHola\n```") == "# Carta\nHola"
     # Sin envoltorio → intacto.
     assert drafts._strip_fence("# Carta\nHola") == "# Carta\nHola"
-    # Con mermaid interno (vallas anidadas) → NO se toca.
+    # Con mermaid interno (vallas anidadas) SIN envoltorio → NO se toca.
     memoria = "# Memoria\n\n```mermaid\nflowchart LR\nA-->B\n```\n\nFin."
     assert drafts._strip_fence(memoria) == memoria
+    # Envoltorio ```markdown ALREDEDOR de contenido con mermaid → se quita, mermaid intacto.
+    wrapped = "```markdown\n# Memoria\n\n```mermaid\nflowchart LR\nA-->B\n```\n\nFin.\n```"
+    unwrapped = drafts._strip_fence(wrapped)
+    assert unwrapped.startswith("# Memoria")
+    assert "```mermaid" in unwrapped
+    assert not unwrapped.startswith("```markdown")
 
 
 def test_bid_strategy_without_market_is_graceful():

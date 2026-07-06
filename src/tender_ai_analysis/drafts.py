@@ -231,16 +231,22 @@ def _checklist() -> str:
 
 
 def _strip_fence(text: str) -> str:
-    """Quita un envoltorio ```markdown … ``` que el LLM añade a veces alrededor de TODA la
-    respuesta. No toca los diagramas mermaid internos: solo actúa si el bloque envolvente no
-    contiene otras vallas ``` dentro."""
+    """Quita el envoltorio ```markdown … ``` que el LLM añade a veces alrededor de TODA la
+    respuesta y que rompe el render.
+
+    Si la primera línea es una valla ```markdown/```md, es siempre un envoltorio → se quita
+    aunque dentro haya diagramas ```mermaid (se preservan). Para otras etiquetas (o sin etiqueta)
+    solo se quita si no hay vallas anidadas, para no romper un bloque de código legítimo."""
     t = (text or "").strip()
-    if t.startswith("```") and t.endswith("```"):
-        nl = t.find("\n")
-        if nl != -1:
-            inner = t[nl + 1 : -3]
-            if "```" not in inner:  # un único bloque envolvente, sin vallas anidadas
-                return inner.strip()
+    if not (t.startswith("```") and t.endswith("```")):
+        return text
+    nl = t.find("\n")
+    if nl == -1:
+        return text
+    tag = t[3:nl].strip().lower()
+    inner = t[nl + 1 : -3]
+    if tag in ("markdown", "md") or "```" not in inner:
+        return inner.strip()
     return text
 
 
