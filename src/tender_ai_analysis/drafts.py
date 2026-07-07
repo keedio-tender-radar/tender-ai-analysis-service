@@ -94,9 +94,10 @@ _LLM_DRAFTS = [
         "metodología, arquitectura/solución propuesta, equipo y perfiles, plan de trabajo y "
         "cronograma, plan de calidad, plan de seguridad, plan de pruebas y transición/soporte. "
         "ESTRUCTÚRALA para RESPONDER PUNTO POR PUNTO a cada criterio de adjudicación "
-        "del brief (especialmente los de juicio de valor), explicando de forma concreta cómo la "
-        "solución satisface y SUPERA cada criterio y sus umbrales de solvencia; incorpora "
-        "mejoras que sumen puntos. Cita el apartado/cláusula del pliego al referenciar requisitos. "
+        "del brief (especialmente los de juicio de valor). INCLUYE UN APARTADO POR CADA CRITERIO, "
+        "SIN OMITIR NINGUNO (indica su ponderación), explicando de forma concreta cómo la solución "
+        "de Keedio satisface y SUPERA cada criterio y sus umbrales de solvencia; propón mejoras "
+        "que sumen puntos. Cita el apartado/cláusula del pliego al referenciar requisitos. "
         "INCLUYE DOS diagramas en bloques de código ```mermaid VÁLIDOS y anclados a la solución: "
         "(1) en 'Arquitectura', un `flowchart LR` con los componentes y flujos de datos de la "
         "solución propuesta para este pliego; (2) en 'Plan de trabajo', un `flowchart TD` con las "
@@ -108,9 +109,11 @@ _LLM_DRAFTS = [
         "matriz_cumplimiento",
         "Matriz de cumplimiento",
         "Genera la MATRIZ DE CUMPLIMIENTO como tabla markdown con columnas EXACTAMENTE "
-        "`| Requisito | Cumple | Evidencia |`, una fila por cada requisito REAL del pliego "
-        "(técnicos, de solvencia y administrativos), lo más exhaustiva posible; en 'Evidencia' "
-        "indica cómo lo cubre Keedio. Devuelve SOLO la tabla.",
+        "`| Requisito | Cumple | Evidencia |`. Cubre SIN OMITIR NINGUNO todos los criterios de "
+        "adjudicación, requisitos de solvencia (con sus umbrales) y obligaciones que figuran en el "
+        "brief y el pliego (técnicos, de solvencia y administrativos); sé exhaustiva, una fila por "
+        "requisito. En 'Cumple' pon Sí/Parcial/No y en 'Evidencia' indica de forma concreta cómo "
+        "lo cubre Keedio y con qué. Devuelve SOLO la tabla.",
     ),
     (
         "documentos_requeridos",
@@ -314,7 +317,7 @@ def analyze_pliego(document_text: str | None, client_factory=None) -> dict:
     """Extrae la estructura del pliego (criterios, solvencia, plazos…). {} si no hay LLM/pliego."""
     if not document_text:
         return {}
-    relevant = _relevant_pliego(document_text, max_chars=30000)
+    relevant = _relevant_pliego(document_text, max_chars=48000)
     data = llm.call_json(
         _PLIEGO_SYSTEM, f"PLIEGO:\n{relevant}\n\n{_PLIEGO_INSTRUCTION}", client_factory
     )
@@ -442,10 +445,12 @@ _REFINE_SYSTEM = (
     "Recibes un borrador y el brief con los criterios de adjudicación del pliego. Detecta sus "
     "debilidades: afirmaciones genéricas sin concreción, criterios de adjudicación poco o nada "
     "cubiertos, ausencia de cifras/plazos/umbrales del pliego, y mejoras que sumarían puntos. "
-    "Reescribe el documento CORRIGIENDO esas debilidades: más concreto y anclado al pliego, con "
-    "mejor cobertura punto por punto de CADA criterio, y más persuasivo, conservando o ampliando "
-    "su extensión. NO expliques la crítica ni añadas comentarios; devuelve SOLO el documento "
-    "MEJORADO en markdown, conservando su estructura y cualquier bloque ```mermaid tal cual."
+    "PRIMERO comprueba que el documento responde a CADA criterio de adjudicación del brief; si "
+    "falta alguno o está flojo, AÑÁDELO o refuérzalo. Reescribe el documento CORRIGIENDO esas "
+    "debilidades: más concreto y anclado al pliego, con cobertura completa punto por punto de "
+    "CADA criterio, y más persuasivo, conservando o ampliando su extensión. NO expliques la "
+    "crítica ni añadas comentarios; devuelve SOLO el documento MEJORADO en markdown, conservando "
+    "su estructura y cualquier bloque ```mermaid tal cual."
 )
 
 
@@ -500,7 +505,7 @@ def generate_drafts(
     if document_text:
         context += (
             "\n\nTEXTO DEL PLIEGO (secciones relevantes, cita el apartado al referenciar):\n"
-            f"{_relevant_pliego(document_text)}\n"
+            f"{_relevant_pliego(document_text, max_chars=32000)}\n"
         )
 
     for kind, title_d, instruction in _LLM_DRAFTS:
