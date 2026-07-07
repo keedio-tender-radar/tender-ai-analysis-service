@@ -31,6 +31,7 @@ class DraftsRequest(BaseModel):
     document_text: str | None = None
     score: dict | None = None
     market_context: dict | None = None  # inteligencia de mercado (MVP-5) → estrategia de puja
+    buyer_profile: dict | None = None  # inteligencia del órgano → contexto de redacción
 
 
 class AnswerRequest(BaseModel):
@@ -106,7 +107,7 @@ def generate_drafts(payload: DraftsRequest) -> dict:
     """Genera borradores de oferta (Go/No-Go, checklist, resumen, memoria, matriz)."""
     drafts = drafts_mod.generate_drafts(
         payload.tender, payload.document_text, payload.score,
-        market_context=payload.market_context,
+        market_context=payload.market_context, buyer_profile=payload.buyer_profile,
     )
     return {"drafts": drafts}
 

@@ -59,30 +59,44 @@ def _relevant_pliego(text: str, max_chars: int = 26000) -> str:
 # `json.loads` fallara con saltos de línea/tablas → se caía a plantilla genérica (memoria "no según
 # el pliego"). Con call_text cada documento es independiente y anclado al pliego.
 _DRAFT_SYSTEM = (
-    "Eres consultor de ofertas a licitaciones públicas para Keedio (datos, IA, integración, "
-    "cloud, ciberseguridad). Redacta en español, concreto y basado EXCLUSIVAMENTE en el anuncio y "
-    "el pliego proporcionados (no inventes datos que no consten). Recoge las cifras, plazos, "
-    "umbrales, criterios de adjudicación con su ponderación y requisitos de solvencia TAL COMO "
-    "aparecen en el pliego, citando el apartado o cláusula cuando sea posible. Si un dato no "
-    "consta en el texto, escribe «no especificado en el pliego» en vez de inventarlo. Devuelve "
-    "SOLO el documento pedido en markdown, sin texto introductorio ni explicaciones alrededor."
+    "Eres consultor sénior de propuestas a licitaciones públicas para Keedio, consultora española "
+    "de datos, IA, integración, cloud y ciberseguridad (ingeniería de datos, plataformas "
+    "analíticas, MLOps, RAG, migración y modernización cloud, gobierno del dato y seguridad). "
+    "Redactas documentos de NIVEL DE PRESENTACIÓN: desarrollados, minuciosos y persuasivos, en "
+    "español profesional. NORMAS: (1) desarrolla cada apartado EN PROFUNDIDAD con prosa completa, "
+    "nunca esquemas ni listas de titulares vacías; (2) ANCLA todo al pliego: recoge cifras, "
+    "plazos, umbrales y criterios de adjudicación con su ponderación TAL COMO constan, citando el "
+    "apartado o cláusula; (3) cuando el brief liste los CRITERIOS DE ADJUDICACIÓN, responde punto "
+    "por punto a cada uno para MAXIMIZAR la puntuación, explicando cómo la solución de Keedio los "
+    "satisface y supera; (4) tiene en cuenta el PERFIL DEL ÓRGANO y el MERCADO del brief para "
+    "calibrar el enfoque y diferenciarse del incumbente; (5) NO inventes: si un dato no consta, "
+    "escribe «no especificado en el pliego». Devuelve SOLO el documento en markdown, sin texto "
+    "introductorio ni explicaciones alrededor."
 )
 
 _LLM_DRAFTS = [
     (
         "resumen_ejecutivo",
         "Resumen ejecutivo",
-        "Redacta el RESUMEN EJECUTIVO de la oferta (markdown). Incluye: objeto del contrato, "
-        "PLAZOS CLAVE (presentación y ejecución), LOTES y presupuesto por lote si los hay, y "
-        "CRITERIOS DE SOLVENCIA técnica y económica exigidos en el pliego.",
+        "Redacta un RESUMEN EJECUTIVO persuasivo y de nivel de presentación (markdown, 3-5 "
+        "párrafos desarrollados). Demuestra comprensión de la necesidad del órgano y presenta la "
+        "PROPUESTA DE VALOR de Keedio: por qué es la mejor opción para ESTE contrato, con qué "
+        "enfoque y qué diferenciadores frente al incumbente/competencia del brief. Cita objeto, "
+        "plazos clave y lotes, y cómo la oferta cubre los criterios de adjudicación y la solvencia "
+        "exigida. Anclado al pliego; concreto, no genérico.",
     ),
     (
         "memoria_tecnica",
-        "Memoria técnica (esquema)",
-        "Redacta un ESQUEMA DE MEMORIA TÉCNICA (markdown) alineado con los requisitos REALES del "
-        "pliego (no genérico): objeto, metodología, arquitectura/solución propuesta, equipo, plan "
-        "de trabajo y cronograma, plan de calidad, seguridad, pruebas y transición/soporte. En "
-        "cada apartado referencia los requisitos concretos del pliego que cubre. "
+        "Memoria técnica",
+        "Redacta una MEMORIA TÉCNICA COMPLETA Y DESARROLLADA (markdown), de nivel de presentación, "
+        "alineada con los requisitos REALES del pliego (nunca genérica ni un esquema): desarrolla "
+        "EN PROFUNDIDAD, con prosa completa, objeto y comprensión de la necesidad, "
+        "metodología, arquitectura/solución propuesta, equipo y perfiles, plan de trabajo y "
+        "cronograma, plan de calidad, plan de seguridad, plan de pruebas y transición/soporte. "
+        "ESTRUCTÚRALA para RESPONDER PUNTO POR PUNTO a cada criterio de adjudicación "
+        "del brief (especialmente los de juicio de valor), explicando de forma concreta cómo la "
+        "solución satisface y SUPERA cada criterio y sus umbrales de solvencia; incorpora "
+        "mejoras que sumen puntos. Cita el apartado/cláusula del pliego al referenciar requisitos. "
         "INCLUYE DOS diagramas en bloques de código ```mermaid VÁLIDOS y anclados a la solución: "
         "(1) en 'Arquitectura', un `flowchart LR` con los componentes y flujos de datos de la "
         "solución propuesta para este pliego; (2) en 'Plan de trabajo', un `flowchart TD` con las "
@@ -275,41 +289,194 @@ def _template(kind: str, tender: dict) -> str:
     return "# Matriz de cumplimiento\n\n| Requisito | Cumple | Evidencia |\n|---|---|---|\n"
 
 
+# --- Etapa 1: comprensión estructurada del pliego (esqueleto de toda la redacción) ---
+
+_PLIEGO_SYSTEM = (
+    "Eres analista experto en pliegos de contratación pública española (Ley 9/2017, LCSP). Lee el "
+    "pliego y extrae su estructura EXACTA en JSON. Usa SOLO lo que conste literalmente; "
+    "deja la lista vacía o el valor null si un dato no aparece. No inventes ni generalices."
+)
+_PLIEGO_INSTRUCTION = (
+    "Devuelve un JSON con estas claves exactas: "
+    "objeto (str), tipo_contrato (servicios|suministro|obra|mixto|s/d), "
+    "procedimiento (abierto|restringido|negociado|s/d), "
+    "criterios_adjudicacion (lista de {criterio, ponderacion, tipo} con tipo en "
+    "precio|juicio_valor|automatico), "
+    "solvencia_tecnica (lista de str con requisitos y sus umbrales exactos), "
+    "solvencia_economica (lista de str con umbrales), plazos (lista de {hito, plazo}), "
+    "lotes (lista de str), penalizaciones (lista de str), "
+    "obligaciones_especiales (lista de str), documentacion_exigida (lista de str). "
+    "Devuelve SOLO el JSON."
+)
+
+
+def analyze_pliego(document_text: str | None, client_factory=None) -> dict:
+    """Extrae la estructura del pliego (criterios, solvencia, plazos…). {} si no hay LLM/pliego."""
+    if not document_text:
+        return {}
+    relevant = _relevant_pliego(document_text, max_chars=30000)
+    data = llm.call_json(
+        _PLIEGO_SYSTEM, f"PLIEGO:\n{relevant}\n\n{_PLIEGO_INSTRUCTION}", client_factory
+    )
+    return data or {}
+
+
+def _fmt_list(vals: list) -> str:
+    out = []
+    for v in vals or []:
+        if isinstance(v, dict):
+            out.append(" — ".join(str(x) for x in v.values() if x))
+        elif v:
+            out.append(str(v))
+    return "; ".join(out)
+
+
+def _format_pliego_md(pliego: dict, title: str) -> str:
+    """Documento visible «Análisis del pliego» a partir de la extracción estructurada."""
+    if not pliego:
+        return (
+            f"# Análisis del pliego — {title}\n\n"
+            "_Pendiente: analiza el pliego (extráelo) para obtener el análisis estructurado._"
+        )
+    lines = [f"# Análisis del pliego — {title}", ""]
+    if pliego.get("objeto"):
+        lines += [f"**Objeto:** {pliego['objeto']}", ""]
+    meta = " · ".join(
+        x for x in [pliego.get("tipo_contrato"), pliego.get("procedimiento")] if x and x != "s/d"
+    )
+    if meta:
+        lines += [f"**Tipo / procedimiento:** {meta}", ""]
+    crits = pliego.get("criterios_adjudicacion") or []
+    if crits:
+        lines += ["## Criterios de adjudicación", "", "| Criterio | Ponderación | Tipo |",
+                  "|---|---|---|"]
+        for c in crits:
+            lines.append(
+                f"| {c.get('criterio', '')} | {c.get('ponderacion', '')} | {c.get('tipo', '')} |"
+            )
+        lines.append("")
+    for key, label in [
+        ("solvencia_tecnica", "Solvencia técnica"),
+        ("solvencia_economica", "Solvencia económica"),
+        ("plazos", "Plazos"),
+        ("lotes", "Lotes"),
+        ("penalizaciones", "Penalizaciones"),
+        ("obligaciones_especiales", "Obligaciones especiales"),
+        ("documentacion_exigida", "Documentación exigida"),
+    ]:
+        vals = pliego.get(key) or []
+        if vals:
+            lines += [f"## {label}", ""]
+            for v in vals:
+                item = _fmt_list([v]) if isinstance(v, dict) else str(v)
+                lines.append(f"- {item}")
+            lines.append("")
+    return "\n".join(lines)
+
+
+def _drafting_brief(
+    tender: dict, pliego: dict, buyer_profile: dict | None, market_context: dict | None
+) -> str:
+    """Brief de redacción: destila pliego + órgano + mercado en instrucciones accionables."""
+    parts = [
+        f"LICITACIÓN: {tender.get('title', '')}",
+        f"Órgano: {tender.get('buyer') or 's/d'} · CPV: {', '.join(tender.get('cpv', []) or [])} "
+        f"· Presupuesto: {tender.get('budget_amount')}",
+    ]
+    if pliego:
+        crits = pliego.get("criterios_adjudicacion") or []
+        if crits:
+            parts.append(
+                "CRITERIOS DE ADJUDICACIÓN (la oferta DEBE responder punto por punto a cada uno "
+                "para maximizar la puntuación):"
+            )
+            for c in crits:
+                parts.append(
+                    f"  · {c.get('criterio', '')} — {c.get('ponderacion', '')} "
+                    f"[{c.get('tipo', '')}]"
+                )
+        for key, label in [
+            ("solvencia_tecnica", "SOLVENCIA TÉCNICA exigida"),
+            ("solvencia_economica", "SOLVENCIA ECONÓMICA exigida"),
+            ("plazos", "PLAZOS"),
+            ("penalizaciones", "PENALIZACIONES"),
+            ("obligaciones_especiales", "OBLIGACIONES ESPECIALES"),
+        ]:
+            v = _fmt_list(pliego.get(key))
+            if v:
+                parts.append(f"{label}: {v}")
+    if buyer_profile:
+        bp = buyer_profile
+        line = f"PERFIL DEL ÓRGANO: {bp.get('tenders_seen', 0)} licitaciones observadas"
+        if bp.get("recurring_cpv"):
+            line += f", CPV recurrentes {', '.join(bp['recurring_cpv'])}"
+        if bp.get("awards_count"):
+            line += (
+                f"; histórico de {bp['awards_count']} adjudicaciones, baja media "
+                f"{bp.get('avg_baja')}, media de {bp.get('avg_bidders')} licitadores"
+            )
+        parts.append(line)
+        if bp.get("top_winners"):
+            parts.append(
+                "Adjudicatarios habituales del órgano: "
+                + ", ".join(f"{w['supplier']} ({w['wins']})" for w in bp["top_winners"])
+            )
+    if market_context and (market_context.get("sample_size") or 0) > 0:
+        inc = market_context.get("incumbent") or {}
+        conc = market_context.get("concentration") or {}
+        m = f"MERCADO: baja esperada {market_context.get('expected_baja')}"
+        if conc.get("label"):
+            m += f", mercado {conc['label']}"
+        if inc.get("supplier"):
+            m += f"; incumbente a batir: {inc['supplier']}"
+        parts.append(m)
+    return "\n".join(parts)
+
+
 def generate_drafts(
     tender: dict,
     document_text: str | None,
     score: dict | None,
     client_factory=None,
     market_context: dict | None = None,
+    buyer_profile: dict | None = None,
 ) -> list[dict]:
     """Devuelve [{kind, title, content}] con los borradores de oferta.
 
     `market_context` (inteligencia de mercado, MVP-5) añade una estrategia de puja determinista.
     """
+    title = tender.get("title", "")
+    use_llm = settings.openrouter_api_key or client_factory is not None
+
+    # Etapa 1: comprensión estructurada del pliego (esqueleto de todos los documentos).
+    pliego = analyze_pliego(document_text, client_factory) if use_llm else {}
+
     drafts = [
         {"kind": "go_no_go", "title": "Informe Go/No-Go", "content": _go_no_go(tender, score)},
+        {"kind": "analisis_pliego", "title": "Análisis del pliego",
+         "content": _format_pliego_md(pliego, title)},
         {"kind": "checklist_administrativo", "title": "Checklist administrativo",
          "content": _checklist()},
         {"kind": "estrategia_puja", "title": "Estrategia de puja",
          "content": _market_strategy(tender, score, market_context)},
     ]
 
-    context = (
-        f"Título: {tender.get('title', '')}\n"
-        f"Resumen: {tender.get('summary', '')}\n"
-        f"CPV: {', '.join(tender.get('cpv', []) or [])}\n"
-        f"Presupuesto: {tender.get('budget_amount')}\n"
-    )
+    # Etapa 2+3: brief rico (pliego estructurado + órgano + mercado) para una redacción minuciosa.
+    brief = _drafting_brief(tender, pliego, buyer_profile, market_context)
+    context = brief
     if document_text:
-        relevant = _relevant_pliego(document_text)
-        context += f"\nTexto del pliego (secciones relevantes):\n{relevant}\n"
+        context += (
+            "\n\nTEXTO DEL PLIEGO (secciones relevantes, cita el apartado al referenciar):\n"
+            f"{_relevant_pliego(document_text)}\n"
+        )
 
-    use_llm = settings.openrouter_api_key or client_factory is not None
-    for kind, title, instruction in _LLM_DRAFTS:
+    for kind, title_d, instruction in _LLM_DRAFTS:
         body = None
         if use_llm:
-            res = llm.call_text(_DRAFT_SYSTEM, f"{context}\n\n{instruction}", client_factory)
+            res = llm.call_text(_DRAFT_SYSTEM, f"{context}\n\nTAREA: {instruction}", client_factory)
             if res:
                 body = _strip_fence(res[0])
-        drafts.append({"kind": kind, "title": title, "content": body or _template(kind, tender)})
+        drafts.append(
+            {"kind": kind, "title": title_d, "content": body or _template(kind, tender)}
+        )
     return drafts

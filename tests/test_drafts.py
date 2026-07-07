@@ -9,6 +9,7 @@ client = TestClient(app)
 
 _KINDS = {
     "go_no_go",
+    "analisis_pliego",
     "checklist_administrativo",
     "estrategia_puja",
     "resumen_ejecutivo",
@@ -41,7 +42,7 @@ def test_generate_drafts_endpoint(monkeypatch):
         json={"tender": {"title": "X"}, "score": {"total": 70, "recommendation": "revisar"}},
     )
     assert resp.status_code == 200
-    assert len(resp.json()["drafts"]) == 8
+    assert len(resp.json()["drafts"]) == 9
 
 
 def test_bid_strategy_uses_market_context(monkeypatch):
@@ -115,3 +116,47 @@ def test_bid_strategy_without_market_is_graceful():
     out = drafts.generate_drafts({"title": "X", "budget_amount": 100000}, None, None)
     strat = next(d for d in out if d["kind"] == "estrategia_puja")
     assert "Sin histórico" in strat["content"]
+
+
+def test_analyze_pliego_extracts_structure():
+    import json
+
+    from tests.conftest import chat, factory_for
+
+    data = {
+        "objeto": "Plataforma de datos",
+        "criterios_adjudicacion": [
+            {"criterio": "Calidad tecnica", "ponderacion": "60 puntos", "tipo": "juicio_valor"}
+        ],
+        "solvencia_tecnica": ["Tres proyectos similares"],
+    }
+    out = drafts.analyze_pliego(
+        "PLIEGO: criterios de adjudicacion...",
+        client_factory=factory_for(lambda req: chat(json.dumps(data))),
+    )
+    assert out["objeto"] == "Plataforma de datos"
+    assert out["criterios_adjudicacion"][0]["criterio"] == "Calidad tecnica"
+
+
+def test_drafts_include_analisis_pliego_and_buyer_profile():
+    import json
+
+    from tests.conftest import chat, factory_for
+
+    data = {
+        "objeto": "X",
+        "criterios_adjudicacion": [
+            {"criterio": "Calidad tecnica", "ponderacion": "60", "tipo": "juicio_valor"}
+        ],
+    }
+    out = drafts.generate_drafts(
+        {"title": "X", "cpv": ["72"], "buyer": "Ayto"},
+        "PLIEGO",
+        {"total": 80, "recommendation": "go"},
+        client_factory=factory_for(lambda req: chat(json.dumps(data))),
+        buyer_profile={"buyer": "Ayto", "tenders_seen": 5, "recurring_cpv": ["72"]},
+    )
+    kinds = {d["kind"] for d in out}
+    assert "analisis_pliego" in kinds
+    ap = next(d for d in out if d["kind"] == "analisis_pliego")
+    assert "Calidad tecnica" in ap["content"]  # el análisis estructurado se vuelca al documento
