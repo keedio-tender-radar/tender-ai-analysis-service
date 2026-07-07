@@ -433,6 +433,39 @@ def _drafting_brief(
     return "\n".join(parts)
 
 
+# --- Segunda pasada: crítica y mejora del documento (revisor experto) ---
+
+_REFINABLE = {"memoria_tecnica", "resumen_ejecutivo"}
+
+_REFINE_SYSTEM = (
+    "Eres revisor experto de propuestas a licitaciones públicas, simulas la mesa de contratación. "
+    "Recibes un borrador y el brief con los criterios de adjudicación del pliego. Detecta sus "
+    "debilidades: afirmaciones genéricas sin concreción, criterios de adjudicación poco o nada "
+    "cubiertos, ausencia de cifras/plazos/umbrales del pliego, y mejoras que sumarían puntos. "
+    "Reescribe el documento CORRIGIENDO esas debilidades: más concreto y anclado al pliego, con "
+    "mejor cobertura punto por punto de CADA criterio, y más persuasivo, conservando o ampliando "
+    "su extensión. NO expliques la crítica ni añadas comentarios; devuelve SOLO el documento "
+    "MEJORADO en markdown, conservando su estructura y cualquier bloque ```mermaid tal cual."
+)
+
+
+def _refine_draft(draft: str, brief: str, client_factory=None) -> str:
+    """Segunda pasada: critica el borrador contra los criterios y devuelve una versión mejorada.
+
+    Conserva el original si el refinado falla o resulta sospechosamente corto (evita truncados).
+    """
+    prompt = (
+        f"{brief}\n\nBORRADOR ACTUAL A MEJORAR:\n{draft}\n\n"
+        "Devuelve el documento MEJORADO (solo el documento)."
+    )
+    res = llm.call_text(_REFINE_SYSTEM, prompt, client_factory)
+    if res:
+        improved = _strip_fence(res[0])
+        if improved and len(improved) >= 0.6 * len(draft):
+            return improved
+    return draft
+
+
 def generate_drafts(
     tender: dict,
     document_text: str | None,
@@ -476,6 +509,9 @@ def generate_drafts(
             res = llm.call_text(_DRAFT_SYSTEM, f"{context}\n\nTAREA: {instruction}", client_factory)
             if res:
                 body = _strip_fence(res[0])
+                # Segunda pasada de crítica y mejora en los documentos de más valor.
+                if settings.draft_refine_pass and kind in _REFINABLE:
+                    body = _refine_draft(body, brief, client_factory)
         drafts.append(
             {"kind": kind, "title": title_d, "content": body or _template(kind, tender)}
         )

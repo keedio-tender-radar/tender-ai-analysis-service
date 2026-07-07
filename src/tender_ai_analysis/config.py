@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     )
     # Modelo de embeddings (OpenRouter, de PAGO). Vacío = RAG semántico desactivado (usa BM25).
     embedding_model: str = ""
+    # Segunda pasada de crítica y mejora sobre memoria/resumen (sube calidad; +2 llamadas LLM).
+    draft_refine_pass: bool = True
 
     # Perfil Keedio (scoring).
     cpv_preferred: str = "72,48"

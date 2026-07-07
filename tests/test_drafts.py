@@ -160,3 +160,60 @@ def test_drafts_include_analisis_pliego_and_buyer_profile():
     assert "analisis_pliego" in kinds
     ap = next(d for d in out if d["kind"] == "analisis_pliego")
     assert "Calidad tecnica" in ap["content"]  # el análisis estructurado se vuelca al documento
+
+
+def test_refine_draft_improves_and_guards_against_truncation():
+    from tests.conftest import chat, factory_for
+
+    long_draft = "# Memoria\n" + ("Contenido desarrollado y concreto. " * 50)
+    improved = drafts._refine_draft(
+        long_draft, "BRIEF con criterios",
+        factory_for(lambda req: chat("# Memoria mejorada\n" + "Mejor y mas concreto. " * 70)),
+    )
+    assert "mejorada" in improved  # acepta la versión mejorada
+    kept = drafts._refine_draft(
+        long_draft, "BRIEF", factory_for(lambda req: chat("corto"))
+    )
+    assert kept == long_draft  # salvaguarda: refinado sospechosamente corto → conserva original
+
+
+def test_refine_pass_applied_to_memoria(monkeypatch):
+    from tests.conftest import chat, factory_for
+
+    monkeypatch.setattr(settings, "openrouter_models", "m")
+    monkeypatch.setattr(settings, "draft_refine_pass", True)
+
+    def responder(req):
+        body = req.content.decode()
+        if "mesa de contrataci" in body:  # segunda pasada (revisor)
+            return chat("# Memoria\n" + "Version REFINADA y concreta. " * 40)
+        if "estructura EXACTA en JSON" in body:  # analyze_pliego
+            return chat("{}")
+        return chat("# Memoria\n" + "Borrador inicial generico. " * 40)  # primera pasada
+
+    out = drafts.generate_drafts(
+        {"title": "X", "cpv": ["72"]}, "PLIEGO", None, client_factory=factory_for(responder)
+    )
+    memoria = next(d for d in out if d["kind"] == "memoria_tecnica")
+    assert "REFINADA" in memoria["content"]
+
+
+def test_refine_pass_disabled(monkeypatch):
+    from tests.conftest import chat, factory_for
+
+    monkeypatch.setattr(settings, "openrouter_models", "m")
+    monkeypatch.setattr(settings, "draft_refine_pass", False)
+
+    def responder(req):
+        body = req.content.decode()
+        if "mesa de contrataci" in body:
+            return chat("REFINADO NO DESEADO")
+        if "estructura EXACTA en JSON" in body:
+            return chat("{}")
+        return chat("# Memoria\n" + "Borrador inicial. " * 40)
+
+    out = drafts.generate_drafts(
+        {"title": "X", "cpv": ["72"]}, "PLIEGO", None, client_factory=factory_for(responder)
+    )
+    memoria = next(d for d in out if d["kind"] == "memoria_tecnica")
+    assert "REFINADO NO DESEADO" not in memoria["content"]  # sin segunda pasada
