@@ -217,3 +217,20 @@ def test_refine_pass_disabled(monkeypatch):
     )
     memoria = next(d for d in out if d["kind"] == "memoria_tecnica")
     assert "REFINADO NO DESEADO" not in memoria["content"]  # sin segunda pasada
+
+
+def test_keedio_capabilities_reach_the_llm(monkeypatch):
+    from tests.conftest import chat, factory_for
+
+    monkeypatch.setattr(settings, "openrouter_models", "m")
+    seen: list[str] = []
+
+    def responder(req):
+        seen.append(req.content.decode())
+        return chat("{}")
+
+    drafts.generate_drafts(
+        {"title": "X", "cpv": ["72"]}, "PLIEGO", None, client_factory=factory_for(responder)
+    )
+    assert any("CAPACIDADES DE KEEDIO" in s for s in seen)
+    assert any("ingenier" in s for s in seen)  # capacidades concretas en el contexto

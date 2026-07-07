@@ -502,6 +502,11 @@ def generate_drafts(
     # Etapa 2+3: brief rico (pliego estructurado + órgano + mercado) para una redacción minuciosa.
     brief = _drafting_brief(tender, pliego, buyer_profile, market_context)
     context = brief
+    if settings.keedio_profile:
+        context += (
+            "\n\nCAPACIDADES DE KEEDIO (úsalas como evidencia concreta; no inventes "
+            f"certificaciones ni referencias que no consten aquí):\n{settings.keedio_profile}"
+        )
     if document_text:
         context += (
             "\n\nTEXTO DEL PLIEGO (secciones relevantes, cita el apartado al referenciar):\n"

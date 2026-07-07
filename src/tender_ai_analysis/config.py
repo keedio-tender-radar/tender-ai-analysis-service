@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     embedding_model: str = ""
     # Segunda pasada de crítica y mejora sobre memoria/resumen (sube calidad; +2 llamadas LLM).
     draft_refine_pass: bool = True
+    # Capacidades reales de Keedio para anclar la redacción (evidencia concreta, no genérica).
+    # Editable por env KEEDIO_PROFILE con certificaciones/proyectos de referencia reales.
+    keedio_profile: str = (
+        "Keedio es una consultora tecnológica española especializada en datos, IA, integración, "
+        "cloud y ciberseguridad. Capacidades: ingeniería de datos (data lakes y data warehouses, "
+        "ETL/ELT, gobierno y calidad del dato), analítica avanzada y business intelligence, IA "
+        "aplicada y MLOps (RAG, procesamiento de lenguaje, modelos en producción), integración de "
+        "sistemas y APIs, cloud y DevOps (Kubernetes, contenedores, IaC, observabilidad) y "
+        "modernización/migración de plataformas. Trabaja con metodologías ágiles, equipos "
+        "certificados y foco en calidad, seguridad y transferencia de conocimiento."
+    )
 
     # Perfil Keedio (scoring).
     cpv_preferred: str = "72,48"
