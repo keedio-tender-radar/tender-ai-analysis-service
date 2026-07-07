@@ -6,6 +6,8 @@ de modo que en tests se inyectan dobles sin red.
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -13,6 +15,8 @@ from tender_ingestion.connectors.base_connector import BaseConnector
 from tender_ingestion.filters import cpv_filter, keyword_filter
 from tender_ingestion.filters.duplicate_filter import DuplicateFilter
 from tender_ingestion.types import TenderPayload
+
+logger = logging.getLogger("tender_ingestion")
 
 Normalizer = Callable[[dict], TenderPayload]
 
@@ -41,14 +45,43 @@ class FilterConfig:
     keywords_negative: list[str]
 
 
-def run_ingestion(sources: list[Source], api_client, cfg: FilterConfig) -> IngestionResult:
+def _fetch_with_retry(connector: BaseConnector, attempts: int, delay: float) -> list[dict]:
+    """Fetch con reintentos y backoff exponencial (absorbe fallos transitorios de la fuente).
+
+    Reintenta ante cualquier excepción; agotados los intentos, propaga la última (el llamador la
+    registra como dead-letter). Con attempts=1 no reintenta (útil en tests).
+    """
+    last: Exception | None = None
+    for i in range(max(1, attempts)):
+        try:
+            return connector.fetch()
+        except Exception as exc:  # noqa: BLE001 — reintentable; se propaga si se agotan intentos
+            last = exc
+            if i < attempts - 1:
+                wait = delay * (2**i)
+                logger.warning(
+                    "fetch %s falló (intento %d/%d): %s — reintento en %.1fs",
+                    connector.name, i + 1, attempts, type(exc).__name__, wait,
+                )
+                time.sleep(wait)
+    raise last  # type: ignore[misc]
+
+
+def run_ingestion(
+    sources: list[Source],
+    api_client,
+    cfg: FilterConfig,
+    *,
+    fetch_attempts: int = 3,
+    retry_delay: float = 1.0,
+) -> IngestionResult:
     result = IngestionResult()
     dedupe = DuplicateFilter()
 
     for source in sources:
         try:
-            raws = source.connector.fetch()
-        except Exception as exc:  # noqa: BLE001 — un conector caído no debe tumbar el job
+            raws = _fetch_with_retry(source.connector, fetch_attempts, retry_delay)
+        except Exception as exc:  # noqa: BLE001 — fuente caída tras reintentos → dead-letter
             result.errors.append(f"{source.connector.name}: fetch {type(exc).__name__}: {exc}")
             continue
 

@@ -24,3 +24,17 @@ class ApiClient:
             )
             resp.raise_for_status()
             return resp.json()
+
+    def report_run(
+        self, job: str, status: str, *, detail: str | None = None,
+        count: int | None = None, run_token: str = "",
+    ) -> None:
+        """POST /api/runs: registra el resultado del job (dispara la alerta si status=error)."""
+        headers = {"X-Run-Token": run_token} if run_token else {}
+        with self._client() as client:
+            resp = client.post(
+                "/api/runs",
+                json={"job": job, "status": status, "detail": detail, "count": count},
+                headers=headers,
+            )
+            resp.raise_for_status()

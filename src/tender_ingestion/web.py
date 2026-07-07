@@ -28,7 +28,19 @@ def health() -> dict:
 
 @app.post("/run", dependencies=[Depends(_auth)])
 def run() -> dict:
-    result = run_ingestion(build_sources(), ApiClient(settings.api_url), build_filter_config())
+    api = ApiClient(settings.api_url)
+    result = run_ingestion(build_sources(), api, build_filter_config())
+    # Reporta a observabilidad: status=error si alguna fuente falló → dispara alerta Telegram.
+    try:
+        api.report_run(
+            "ingestion",
+            "error" if result.errors else "ok",
+            detail="; ".join(result.errors)[:500] or None,
+            count=result.published,
+            run_token=settings.run_token,
+        )
+    except Exception:  # noqa: BLE001 — el reporte no debe tumbar la respuesta de la ingesta
+        pass
     return {
         "fetched": result.fetched,
         "relevant": result.relevant,
