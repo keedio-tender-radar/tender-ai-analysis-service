@@ -86,26 +86,6 @@ _LLM_DRAFTS = [
         "exigida. Anclado al pliego; concreto, no genérico.",
     ),
     (
-        "memoria_tecnica",
-        "Memoria técnica",
-        "Redacta una MEMORIA TÉCNICA COMPLETA Y DESARROLLADA (markdown), de nivel de presentación, "
-        "alineada con los requisitos REALES del pliego (nunca genérica ni un esquema): desarrolla "
-        "EN PROFUNDIDAD, con prosa completa, objeto y comprensión de la necesidad, "
-        "metodología, arquitectura/solución propuesta, equipo y perfiles, plan de trabajo y "
-        "cronograma, plan de calidad, plan de seguridad, plan de pruebas y transición/soporte. "
-        "ESTRUCTÚRALA para RESPONDER PUNTO POR PUNTO a cada criterio de adjudicación "
-        "del brief (especialmente los de juicio de valor). INCLUYE UN APARTADO POR CADA CRITERIO, "
-        "SIN OMITIR NINGUNO (indica su ponderación), explicando de forma concreta cómo la solución "
-        "de Keedio satisface y SUPERA cada criterio y sus umbrales de solvencia; propón mejoras "
-        "que sumen puntos. Cita el apartado/cláusula del pliego al referenciar requisitos. "
-        "INCLUYE DOS diagramas en bloques de código ```mermaid VÁLIDOS y anclados a la solución: "
-        "(1) en 'Arquitectura', un `flowchart LR` con los componentes y flujos de datos de la "
-        "solución propuesta para este pliego; (2) en 'Plan de trabajo', un `flowchart TD` con las "
-        "FASES del proyecto en orden. Usa identificadores simples (A, B, C…) y etiquetas entre "
-        "corchetes `[Texto]`; evita comillas, paréntesis y acentos dentro de las etiquetas para "
-        "no romper la sintaxis Mermaid.",
-    ),
-    (
         "matriz_cumplimiento",
         "Matriz de cumplimiento",
         "Genera la MATRIZ DE CUMPLIMIENTO como tabla markdown con columnas EXACTAMENTE "
@@ -436,9 +416,81 @@ def _drafting_brief(
     return "\n".join(parts)
 
 
+# --- Memoria técnica EN PROFUNDIDAD: sección por sección (una llamada por apartado) ---
+
+_MEMORIA_SECTION_SYSTEM = (
+    "Eres consultor sénior de propuestas técnicas de Keedio (datos, IA, integración, cloud, "
+    "ciberseguridad). Redactas UN apartado de la memoria técnica con la MÁXIMA profundidad y "
+    "concreción, en prosa desarrollada de nivel de presentación, anclada EXCLUSIVAMENTE al pliego "
+    "y a las capacidades de Keedio del contexto (no inventes datos ni certificaciones que no "
+    "consten). Extiéndete: usa subapartados, detalle técnico, justificación de decisiones y "
+    "ejemplos concretos aplicados a ESTE contrato. Devuelve SOLO el apartado en markdown, "
+    "empezando por su encabezado `## …`, sin texto alrededor."
+)
+
+_MEMORIA_SECTIONS = [
+    ("Objeto y comprensión de la necesidad",
+     "Desarrolla en profundidad la comprensión del OBJETO y la necesidad del órgano: contexto, "
+     "problemática, retos, alcance y resultados esperados, demostrando dominio del pliego."),
+    ("Metodología",
+     "Desarrolla la METODOLOGÍA aplicada a este contrato: marcos y estándares, procesos, "
+     "gobernanza, gestión de proyecto y de riesgos, control y seguimiento; con el porqué de cada "
+     "elección."),
+    ("Arquitectura y solución técnica propuesta",
+     "Desarrolla en detalle la SOLUCIÓN TÉCNICA y la ARQUITECTURA para este pliego: componentes, "
+     "tecnologías, integraciones, flujos de datos, escalabilidad, disponibilidad y decisiones de "
+     "diseño justificadas. INCLUYE un diagrama en bloque ```mermaid `flowchart LR` válido de la "
+     "arquitectura (identificadores A,B,C… y etiquetas [Texto] sin comillas ni acentos)."),
+    ("Plan de trabajo y cronograma",
+     "Desarrolla el PLAN DE TRABAJO por FASES con actividades, hitos, entregables, dependencias y "
+     "duración, alineado con los plazos del pliego. INCLUYE un diagrama ```mermaid `flowchart TD` "
+     "válido con las fases en orden (identificadores simples y etiquetas [Texto])."),
+    ("Equipo y perfiles",
+     "Detalla el EQUIPO propuesto: perfiles, roles, responsabilidades, dedicación, experiencia y "
+     "certificaciones que CUBREN Y SUPERAN la solvencia técnica exigida en el brief."),
+    ("Plan de calidad",
+     "Desarrolla el PLAN DE CALIDAD: objetivos e indicadores (KPIs/SLAs), controles, aseguramiento "
+     "y mejora continua, y cómo garantiza el cumplimiento de los requisitos del pliego."),
+    ("Plan de seguridad y protección de datos",
+     "Desarrolla el PLAN DE SEGURIDAD y protección de datos: medidas técnicas y organizativas, "
+     "cumplimiento (ENS/RGPD si aplica), gestión de accesos, cifrado, continuidad y respuesta a "
+     "incidentes, ajustado a lo exigido por el pliego."),
+    ("Plan de pruebas, transición y soporte",
+     "Desarrolla el PLAN DE PRUEBAS (tipos, entornos, criterios de aceptación), la TRANSICIÓN "
+     "(entrada/salida, traspaso, formación) y el SOPORTE/mantenimiento (niveles y tiempos "
+     "de respuesta), concretos y anclados al pliego."),
+]
+
+
+def _generate_memoria_deep(title: str, context: str, pliego: dict, client_factory=None) -> str:
+    """Memoria técnica apartado por apartado: una llamada LLM por sección → profundidad real."""
+    parts = [f"# Memoria técnica — {title}", ""]
+    for heading, instruction in _MEMORIA_SECTIONS:
+        prompt = (
+            f"{context}\n\nTAREA: {instruction}\n"
+            f"Empieza el apartado por el encabezado `## {heading}`."
+        )
+        res = llm.call_text(_MEMORIA_SECTION_SYSTEM, prompt, client_factory)
+        fallback = f"## {heading}\n\n_No especificado en el pliego._"
+        parts += [_strip_fence(res[0]) if res else fallback, ""]
+    crit = (pliego or {}).get("criterios_adjudicacion") or []
+    if crit:
+        prompt = (
+            f"{context}\n\nTAREA: Redacta el apartado RESPUESTA A LOS CRITERIOS DE ADJUDICACIÓN. "
+            "Para CADA criterio del brief crea un subapartado `### <criterio> (<ponderación>)` "
+            "explicando EN DETALLE y con evidencia concreta cómo la solución lo satisface "
+            "y lo SUPERA, e incluye mejoras que sumen puntos. No omitas NINGÚN criterio. Empieza "
+            "por `## Respuesta a los criterios de adjudicación`."
+        )
+        res = llm.call_text(_MEMORIA_SECTION_SYSTEM, prompt, client_factory)
+        if res:
+            parts += [_strip_fence(res[0]), ""]
+    return "\n".join(parts).strip()
+
+
 # --- Segunda pasada: crítica y mejora del documento (revisor experto) ---
 
-_REFINABLE = {"memoria_tecnica", "resumen_ejecutivo"}
+_REFINABLE = {"resumen_ejecutivo"}  # la memoria ya se genera sección a sección (profunda)
 
 _REFINE_SYSTEM = (
     "Eres revisor experto de propuestas a licitaciones públicas, simulas la mesa de contratación. "
@@ -525,4 +577,17 @@ def generate_drafts(
         drafts.append(
             {"kind": kind, "title": title_d, "content": body or _template(kind, tender)}
         )
+
+    # Memoria técnica EN PROFUNDIDAD (una llamada por apartado) — insertada tras el resumen.
+    memoria = (
+        _generate_memoria_deep(title, context, pliego, client_factory)
+        if use_llm
+        else _template("memoria_tecnica", tender)
+    )
+    idx = next(
+        (i for i, d in enumerate(drafts) if d["kind"] == "resumen_ejecutivo"), len(drafts) - 1
+    )
+    drafts.insert(
+        idx + 1, {"kind": "memoria_tecnica", "title": "Memoria técnica", "content": memoria}
+    )
     return drafts

@@ -194,8 +194,8 @@ def test_refine_pass_applied_to_memoria(monkeypatch):
     out = drafts.generate_drafts(
         {"title": "X", "cpv": ["72"]}, "PLIEGO", None, client_factory=factory_for(responder)
     )
-    memoria = next(d for d in out if d["kind"] == "memoria_tecnica")
-    assert "REFINADA" in memoria["content"]
+    resumen = next(d for d in out if d["kind"] == "resumen_ejecutivo")
+    assert "REFINADA" in resumen["content"]  # la 2ª pasada se aplica al resumen
 
 
 def test_refine_pass_disabled(monkeypatch):
@@ -215,8 +215,8 @@ def test_refine_pass_disabled(monkeypatch):
     out = drafts.generate_drafts(
         {"title": "X", "cpv": ["72"]}, "PLIEGO", None, client_factory=factory_for(responder)
     )
-    memoria = next(d for d in out if d["kind"] == "memoria_tecnica")
-    assert "REFINADO NO DESEADO" not in memoria["content"]  # sin segunda pasada
+    resumen = next(d for d in out if d["kind"] == "resumen_ejecutivo")
+    assert "REFINADO NO DESEADO" not in resumen["content"]  # sin segunda pasada
 
 
 def test_keedio_capabilities_reach_the_llm(monkeypatch):
@@ -234,3 +234,27 @@ def test_keedio_capabilities_reach_the_llm(monkeypatch):
     )
     assert any("CAPACIDADES DE KEEDIO" in s for s in seen)
     assert any("ingenier" in s for s in seen)  # capacidades concretas en el contexto
+
+
+def test_memoria_generated_section_by_section():
+    import json as _json
+
+    from tests.conftest import chat, factory_for
+
+    pliego = {"criterios_adjudicacion": [
+        {"criterio": "Calidad tecnica", "ponderacion": "60", "tipo": "juicio_valor"}
+    ]}
+
+    def responder(req):
+        body = req.content.decode()
+        if "estructura EXACTA en JSON" in body:
+            return chat(_json.dumps(pliego))
+        return chat("## Seccion\nContenido tecnico desarrollado y concreto.")
+
+    out = drafts.generate_drafts(
+        {"title": "X", "cpv": ["72"]}, "PLIEGO largo", None,
+        client_factory=factory_for(responder),
+    )
+    mem = next(d for d in out if d["kind"] == "memoria_tecnica")["content"]
+    assert "Memoria técnica — X" in mem
+    assert mem.count("## ") >= 8  # 8 apartados dedicados + respuesta a criterios
